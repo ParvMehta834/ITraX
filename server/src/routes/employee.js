@@ -1,19 +1,29 @@
+/**
+ * Employee Routes - Complete CRUD with proper error handling
+ */
+
 const express = require('express');
-const { authMiddleware, requireRole } = require('../middleware/auth');
-const Asset = require('../models/Asset');
+const { authMiddleware } = require('../middleware/auth');
+const employeeController = require('../controllers/employeeController');
 
 const router = express.Router();
 
-// Get assets assigned to current employee
-router.get('/assets', authMiddleware, requireRole('EMPLOYEE'), async (req, res) => {
-  const list = await Asset.find({ currentEmployeeId: req.user._id }).lean();
-  res.json({ data: list });
-});
+// All endpoints require authentication
+router.use(authMiddleware);
 
-// Employee can create an order/request (basic)
-router.post('/orders', authMiddleware, requireRole('EMPLOYEE'), async (req, res) => {
-  // minimal stub for orders
-  res.json({ ok: true, message: 'Order request created (demo)' });
-});
+// GET all employees with search, filters, pagination
+router.get('/', employeeController.getEmployees);
+
+// POST create employee
+router.post('/', employeeController.createEmployee);
+
+// GET single employee
+router.get('/:id', employeeController.getEmployeeById);
+
+// PUT update employee
+router.put('/:id', employeeController.updateEmployee);
+
+// DELETE soft delete employee
+router.delete('/:id', employeeController.deleteEmployee);
 
 module.exports = router;

@@ -74,7 +74,12 @@ export default function AddEditAssetModal({ isOpen, onClose, onSuccess, asset = 
       onClose();
     } catch (err) {
       const errData = err.response?.data;
-      if (errData?.errors) {
+      const status = err.response?.status;
+      
+      // Handle authentication errors
+      if (status === 401) {
+        setErrors({ submit: 'You must be logged in to perform this action' });
+      } else if (errData?.errors) {
         setErrors(errData.errors);
       } else {
         setErrors({ submit: errData?.message || 'Failed to save asset' });

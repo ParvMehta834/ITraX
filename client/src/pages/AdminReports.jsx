@@ -55,10 +55,11 @@ export default function AdminReports() {
   const handlePreview = async (reportId) => {
     setLoading(reportId);
     try {
-      const response = await reportsService.getReport(reportId);
+      const payload = await reportsService.getReport(reportId);
+      const data = payload.data || payload || [];
       setReportData(prev => ({
         ...prev,
-        [reportId]: response.data.data || response.data || []
+        [reportId]: data
       }));
       showToast(`${reportId} preview loaded`, 'success');
     } catch (error) {

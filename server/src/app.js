@@ -33,6 +33,7 @@ app.use('/api/licenses', licensesRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/assets', assetsRoutes);
 app.use('/api/orders', ordersRoutes);
+app.use('/api/tracking', ordersRoutes);
 
 app.get('/', (req, res) => res.json({ ok: true, app: 'ITraX API' }));
 

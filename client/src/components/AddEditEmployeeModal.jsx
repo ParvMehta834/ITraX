@@ -83,7 +83,12 @@ export default function AddEditEmployeeModal({ isOpen, onClose, onSuccess, emplo
       onSuccess();
       onClose();
     } catch (error) {
-      setErrors({ submit: error.response?.data?.message || 'Failed to save employee' });
+      const status = error.response?.status;
+      if (status === 401) {
+        setErrors({ submit: 'You must be logged in to perform this action' });
+      } else {
+        setErrors({ submit: error.response?.data?.message || 'Failed to save employee' });
+      }
     } finally {
       setLoading(false);
     }

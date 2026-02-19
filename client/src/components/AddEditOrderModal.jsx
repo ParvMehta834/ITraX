@@ -72,7 +72,10 @@ export default function AddEditOrderModal({ isOpen, onClose, onSuccess, order = 
       onClose();
     } catch (err) {
       const errData = err.response?.data;
-      if (errData?.errors) {
+      const status = error.response?.status;
+      if (status === 401) {
+        setErrors({ submit: 'You must be logged in to perform this action' });
+      } else if (errData?.errors) {
         setErrors(errData.errors);
       } else {
         setErrors({ submit: errData?.message || 'Failed to save order' });

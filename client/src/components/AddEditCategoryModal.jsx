@@ -62,7 +62,12 @@ export default function AddEditCategoryModal({ isOpen, onClose, onSuccess, categ
       onSuccess();
       onClose();
     } catch (error) {
-      setErrors({ submit: error.response?.data?.message || 'Failed to save category' });
+      const status = error.response?.status;
+      if (status === 401) {
+        setErrors({ submit: 'You must be logged in to perform this action' });
+      } else {
+        setErrors({ submit: error.response?.data?.message || 'Failed to save category' });
+      }
     } finally {
       setLoading(false);
     }

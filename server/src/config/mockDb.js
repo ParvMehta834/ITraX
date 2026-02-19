@@ -6,6 +6,7 @@ const inventoryItems = [];
 const notifications = [];
 const categories = [];
 const locations = [];
+const employees = [];
 
 class MockDB {
   static getUsers() {
@@ -120,19 +121,148 @@ class MockDB {
     return location;
   }
 
-  // Inventory
-  static getInventory() {
+  // Assets (continued)
+  static getAssetById(id) {
+    return assets.find(a => a._id === id);
+  }
+
+  static updateAsset(id, updates) {
+    const asset = assets.find(a => a._id === id);
+    if (asset) {
+      Object.assign(asset, updates, { updatedAt: new Date() });
+    }
+    return asset;
+  }
+
+  static deleteAsset(id) {
+    const index = assets.findIndex(a => a._id === id);
+    if (index > -1) {
+      return assets.splice(index, 1)[0];
+    }
+    return null;
+  }
+
+  // Licenses (continued)
+  static getLicenseById(id) {
+    return licenses.find(l => l._id === id);
+  }
+
+  static updateLicense(id, updates) {
+    const license = licenses.find(l => l._id === id);
+    if (license) {
+      Object.assign(license, updates, { updatedAt: new Date() });
+    }
+    return license;
+  }
+
+  static deleteLicense(id) {
+    const index = licenses.findIndex(l => l._id === id);
+    if (index > -1) {
+      return licenses.splice(index, 1)[0];
+    }
+    return null;
+  }
+
+  // Categories (continued)
+  static getCategoryById(id) {
+    return categories.find(c => c._id === id);
+  }
+
+  static updateCategory(id, updates) {
+    const category = categories.find(c => c._id === id);
+    if (category) {
+      Object.assign(category, updates, { updatedAt: new Date() });
+    }
+    return category;
+  }
+
+  static deleteCategory(id) {
+    const index = categories.findIndex(c => c._id === id);
+    if (index > -1) {
+      return categories.splice(index, 1)[0];
+    }
+    return null;
+  }
+
+  // Locations (continued)
+  static getLocationById(id) {
+    return locations.find(l => l._id === id);
+  }
+
+  static updateLocation(id, updates) {
+    const location = locations.find(l => l._id === id);
+    if (location) {
+      Object.assign(location, updates, { updatedAt: new Date() });
+    }
+    return location;
+  }
+
+  static deleteLocation(id) {
+    const index = locations.findIndex(l => l._id === id);
+    if (index > -1) {
+      return locations.splice(index, 1)[0];
+    }
+    return null;
+  }
+
+  // Inventory (continued)
+  static getInventoryItems() {
     return inventoryItems;
   }
 
-  static createInventoryItem(data) {
-    const item = {
-      _id: `inv_${Date.now()}`,
+  static getInventoryItemById(id) {
+    return inventoryItems.find(i => i._id === id);
+  }
+
+  static updateInventoryItem(id, updates) {
+    const item = inventoryItems.find(i => i._id === id);
+    if (item) {
+      Object.assign(item, updates, { updatedAt: new Date() });
+    }
+    return item;
+  }
+
+  static deleteInventoryItem(id) {
+    const index = inventoryItems.findIndex(i => i._id === id);
+    if (index > -1) {
+      return inventoryItems.splice(index, 1)[0];
+    }
+    return null;
+  }
+
+  // Employees
+  static getEmployees() {
+    return employees;
+  }
+
+  static getEmployeeById(id) {
+    return employees.find(e => e._id === id);
+  }
+
+  static createEmployee(data) {
+    const employee = {
+      _id: `emp_${Date.now()}`,
       ...data,
       createdAt: new Date(),
     };
-    inventoryItems.push(item);
-    return item;
+    employees.push(employee);
+    return employee;
+  }
+
+  static updateEmployee(id, updates) {
+    const employee = employees.find(e => e._id === id);
+    if (employee) {
+      Object.assign(employee, updates, { updatedAt: new Date() });
+    }
+    return employee;
+  }
+
+  static deleteEmployee(id) {
+    const index = employees.findIndex(e => e._id === id);
+    if (index > -1) {
+      return employees.splice(index, 1)[0];
+    }
+    return null;
   }
 
   // Clear all (useful for testing)
@@ -144,6 +274,7 @@ class MockDB {
     notifications.length = 0;
     categories.length = 0;
     locations.length = 0;
+    employees.length = 0;
   }
 }
 

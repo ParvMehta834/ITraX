@@ -30,13 +30,14 @@ export default function AdminLocations() {
         };
         Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
 
-        const response = await locationsService.getLocations(params);
-        setLocations(response.data.data || []);
+        const result = await locationsService.getLocations(params);
+        const paging = result.pagination || {};
+        setLocations(result.data || []);
         setPagination({
-          page: response.data.page,
-          limit: response.data.limit,
-          total: response.data.total,
-          totalPages: response.data.totalPages
+          page: paging.page ?? 1,
+          limit: paging.limit ?? pagination.limit,
+          total: paging.total ?? 0,
+          totalPages: paging.pages ?? 1
         });
       } catch (error) {
         showToast('Failed to load locations', 'error');

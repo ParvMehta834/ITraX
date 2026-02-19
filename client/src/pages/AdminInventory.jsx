@@ -40,17 +40,18 @@ export default function AdminInventory() {
         // Remove undefined values
         Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
 
-        const response = await inventoryService.getItems(params);
-        setItems(response.data.data || []);
+        const result = await inventoryService.getItems(params);
+        const paging = result.pagination || {};
+        setItems(result.data || []);
         setPagination({
-          page: response.data.page,
-          limit: response.data.limit,
-          total: response.data.total,
-          totalPages: response.data.totalPages
+          page: paging.page ?? 1,
+          limit: paging.limit ?? pagination.limit,
+          total: paging.total ?? 0,
+          totalPages: paging.pages ?? 1
         });
 
         // Extract unique locations
-        const uniqueLocations = [...new Set(response.data.data.map(item => item.location))];
+        const uniqueLocations = [...new Set((result.data || []).map(item => item.location))];
         setLocations(uniqueLocations);
       } catch (err) {
         showToast('Failed to fetch inventory items', 'error');

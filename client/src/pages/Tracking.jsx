@@ -38,13 +38,14 @@ export default function TrackingPage() {
         // Remove undefined values
         Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
 
-        const response = await orderService.getOrders(params);
-        setOrders(response.data.data || []);
+        const result = await orderService.getOrders(params);
+        const paging = result.pagination || {};
+        setOrders(result.data || []);
         setPagination({
-          page: response.data.page,
-          limit: response.data.limit,
-          total: response.data.total,
-          totalPages: response.data.totalPages
+          page: paging.page ?? 1,
+          limit: paging.limit ?? pagination.limit,
+          total: paging.total ?? 0,
+          totalPages: paging.pages ?? 1
         });
       } catch (err) {
         showToast('Failed to fetch orders', 'error');

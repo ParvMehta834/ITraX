@@ -30,13 +30,14 @@ export default function AdminEmployees() {
         };
         Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
 
-        const response = await employeesService.getEmployees(params);
-        setEmployees(response.data.data || []);
+        const result = await employeesService.getEmployees(params);
+        const paging = result.pagination || {};
+        setEmployees(result.data || []);
         setPagination({
-          page: response.data.page,
-          limit: response.data.limit,
-          total: response.data.total,
-          totalPages: response.data.totalPages
+          page: paging.page ?? 1,
+          limit: paging.limit ?? pagination.limit,
+          total: paging.total ?? 0,
+          totalPages: paging.pages ?? 1
         });
       } catch (error) {
         showToast('Failed to load employees', 'error');

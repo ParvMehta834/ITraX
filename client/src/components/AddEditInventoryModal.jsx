@@ -103,7 +103,12 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
       onSuccess();
       onClose();
     } catch (error) {
-      setErrors({ submit: error.response?.data?.message || 'Failed to save item' });
+      const status = error.response?.status;
+      if (status === 401) {
+        setErrors({ submit: 'You must be logged in to perform this action' });
+      } else {
+        setErrors({ submit: error.response?.data?.message || 'Failed to save item' });
+      }
     } finally {
       setLoading(false);
     }

@@ -82,7 +82,12 @@ export default function AddEditLocationModal({ isOpen, onClose, onSuccess, locat
       onSuccess();
       onClose();
     } catch (error) {
-      setErrors({ submit: error.response?.data?.message || 'Failed to save location' });
+      const status = error.response?.status;
+      if (status === 401) {
+        setErrors({ submit: 'You must be logged in to perform this action' });
+      } else {
+        setErrors({ submit: error.response?.data?.message || 'Failed to save location' });
+      }
     } finally {
       setLoading(false);
     }

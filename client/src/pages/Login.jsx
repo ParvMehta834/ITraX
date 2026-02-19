@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { safeJson } from '../utils/safeJson'
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('')
@@ -29,11 +30,15 @@ export default function Login({ onLogin }) {
         body: JSON.stringify({ email: email.trim(), password })
       })
       
-      const data = await res.json()
+      const { data } = await safeJson(res)
       if (!res.ok) {
-        return setErr(data.message || 'Login failed')
+        return setErr(data?.message || `Login failed (${res.status})`)
       }
       
+      if (!data?.token || !data?.user) {
+        return setErr('Login succeeded but response was empty')
+      }
+
       localStorage.setItem('itrax_token', data.token)
       localStorage.setItem('itrax_user', JSON.stringify(data.user))
       onLogin && onLogin(data.user)
