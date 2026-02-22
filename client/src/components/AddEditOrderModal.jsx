@@ -61,24 +61,66 @@ export default function AddEditOrderModal({ isOpen, onClose, onSuccess, order = 
     setErrors({});
 
     try {
+      // Validate required fields before sending
+      const requiredErrors = {};
+      if (!formData.assetName?.trim()) requiredErrors.assetName = 'Asset name is required';
+      if (!formData.quantity || formData.quantity < 1) requiredErrors.quantity = 'Quantity must be at least 1';
+      if (!formData.supplier?.trim()) requiredErrors.supplier = 'Supplier is required';
+      if (!formData.estimatedDelivery) requiredErrors.estimatedDelivery = 'Estimated delivery date is required';
+      if (!formData.currentLocation?.trim()) requiredErrors.currentLocation = 'Current location is required';
+
+      if (Object.keys(requiredErrors).length > 0) {
+        setErrors(requiredErrors);
+        setLoading(false);
+        return;
+      }
+
+      // Prepare data for submission
+      const submitData = {
+        orderId: formData.orderId || undefined,
+        assetName: formData.assetName.trim(),
+        quantity: parseInt(formData.quantity, 10),
+        supplier: formData.supplier.trim(),
+        orderDate: formData.orderDate || new Date().toISOString(),
+        estimatedDelivery: formData.estimatedDelivery,
+        currentLocation: formData.currentLocation.trim(),
+        status: formData.status,
+        notes: formData.notes?.trim() || ''
+      };
+
       if (order) {
         // Update existing order
-        await orderService.updateOrder(order._id, formData);
+        await orderService.updateOrder(order._id, submitData);
       } else {
         // Create new order
-        await orderService.createOrder(formData);
+        await orderService.createOrder(submitData);
       }
       onSuccess();
       onClose();
     } catch (err) {
+      console.error('Error creating/updating order:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message,
+        fullError: err
+      });
+
       const errData = err.response?.data;
-      const status = error.response?.status;
-      if (status === 401) {
-        setErrors({ submit: 'You must be logged in to perform this action' });
-      } else if (errData?.errors) {
+      const status = err.response?.status;
+      
+      if (!err.response) {
+        // Network error
+        setErrors({ submit: 'Network error - please check your connection' });
+      } else if (status === 401) {
+        setErrors({ submit: 'You must be logged in to perform this action. Please log in and try again.' });
+      } else if (status === 403) {
+        setErrors({ submit: 'You do not have permission to create orders. Admin access required.' });
+      } else if (status === 400 && errData?.errors) {
         setErrors(errData.errors);
+      } else if (status === 400) {
+        setErrors({ submit: errData?.message || 'Please check all required fields are filled correctly' });
       } else {
-        setErrors({ submit: errData?.message || 'Failed to save order' });
+        setErrors({ submit: errData?.message || `Failed to save order (Error ${status})` });
       }
     } finally {
       setLoading(false);

@@ -5,10 +5,11 @@ import inventoryService from '../services/inventoryService';
 export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item = null }) {
   const [formData, setFormData] = useState({
     name: '',
+    description: '',
+    quantity: '',
     location: '',
-    quantityOnHand: '',
-    quantityMinimum: '',
-    costPerItem: ''
+    sku: '',
+    reorderLevel: ''
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -19,18 +20,20 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
     if (item) {
       setFormData({
         name: item.name || '',
+        description: item.description || '',
+        quantity: item.quantity || '',
         location: item.location || '',
-        quantityOnHand: item.quantityOnHand || '',
-        quantityMinimum: item.quantityMinimum || '',
-        costPerItem: item.costPerItem || ''
+        sku: item.sku || '',
+        reorderLevel: item.reorderLevel || ''
       });
     } else {
       setFormData({
         name: '',
+        description: '',
+        quantity: '',
         location: '',
-        quantityOnHand: '',
-        quantityMinimum: '',
-        costPerItem: ''
+        sku: '',
+        reorderLevel: ''
       });
     }
     setErrors({});
@@ -38,10 +41,10 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
 
   // Auto-calculate total
   useEffect(() => {
-    const qty = parseFloat(formData.quantityOnHand) || 0;
-    const cost = parseFloat(formData.costPerItem) || 0;
-    setTotal(qty * cost);
-  }, [formData.quantityOnHand, formData.costPerItem]);
+    const qty = parseFloat(formData.quantity) || 0;
+    // Since we don't have cost per item, just show quantity
+    setTotal(qty);
+  }, [formData.quantity]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -59,20 +62,14 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
       newErrors.name = 'Name is required';
     }
     
-    if (!formData.location.trim()) {
-      newErrors.location = 'Location is required';
+    if (!formData.quantity && formData.quantity !== 0) {
+      newErrors.quantity = 'Quantity is required';
+    } else if (formData.quantity < 0) {
+      newErrors.quantity = 'Quantity must be 0 or greater';
     }
     
-    if (formData.quantityOnHand === '' || formData.quantityOnHand < 0) {
-      newErrors.quantityOnHand = 'Quantity on hand must be 0 or greater';
-    }
-    
-    if (formData.quantityMinimum === '' || formData.quantityMinimum < 0) {
-      newErrors.quantityMinimum = 'Minimum quantity must be 0 or greater';
-    }
-    
-    if (formData.costPerItem === '' || formData.costPerItem < 0) {
-      newErrors.costPerItem = 'Cost per item must be 0 or greater';
+    if (formData.reorderLevel && formData.reorderLevel < 0) {
+      newErrors.reorderLevel = 'Reorder level must be 0 or greater';
     }
     
     setErrors(newErrors);
@@ -88,10 +85,11 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
     try {
       const data = {
         name: formData.name.trim(),
-        location: formData.location.trim(),
-        quantityOnHand: parseFloat(formData.quantityOnHand),
-        quantityMinimum: parseFloat(formData.quantityMinimum),
-        costPerItem: parseFloat(formData.costPerItem)
+        description: formData.description.trim(),
+        quantity: parseInt(formData.quantity, 10),
+        location: formData.location || undefined,
+        sku: formData.sku.trim() || undefined,
+        reorderLevel: formData.reorderLevel ? parseInt(formData.reorderLevel, 10) : undefined
       };
       
       if (item) {
@@ -151,88 +149,87 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
               {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
             </div>
 
-            {/* Location */}
+            {/* Description */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Location *
+                Description
               </label>
-              <input
-                type="text"
-                name="location"
-                value={formData.location}
+              <textarea
+                name="description"
+                value={formData.description}
                 onChange={handleChange}
-                placeholder="e.g., Warehouse A, Office Floor 2"
+                placeholder="Item description (optional)"
+                rows="2"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {errors.location && <p className="text-red-500 text-xs mt-1">{errors.location}</p>}
             </div>
 
-            {/* Quantity Row */}
+            {/* Quantity & Location Row */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quantity on Hand *
+                  Quantity *
                 </label>
                 <input
                   type="number"
-                  name="quantityOnHand"
-                  value={formData.quantityOnHand}
+                  name="quantity"
+                  value={formData.quantity}
                   onChange={handleChange}
                   min="0"
                   step="1"
                   placeholder="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                {errors.quantityOnHand && <p className="text-red-500 text-xs mt-1">{errors.quantityOnHand}</p>}
+                {errors.quantity && <p className="text-red-500 text-xs mt-1">{errors.quantity}</p>}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Minimum Quantity *
+                  Location
+                </label>
+                <input
+                  type="text"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange}
+                  placeholder="e.g., Warehouse A"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* SKU & Reorder Level Row */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  SKU
+                </label>
+                <input
+                  type="text"
+                  name="sku"
+                  value={formData.sku}
+                  onChange={handleChange}
+                  placeholder="Stock Keeping Unit (optional)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reorder Level
                 </label>
                 <input
                   type="number"
-                  name="quantityMinimum"
-                  value={formData.quantityMinimum}
+                  name="reorderLevel"
+                  value={formData.reorderLevel}
                   onChange={handleChange}
                   min="0"
                   step="1"
                   placeholder="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                {errors.quantityMinimum && <p className="text-red-500 text-xs mt-1">{errors.quantityMinimum}</p>}
+                {errors.reorderLevel && <p className="text-red-500 text-xs mt-1">{errors.reorderLevel}</p>}
               </div>
-            </div>
-
-            {/* Cost Per Item */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Cost per Item *
-              </label>
-              <input
-                type="number"
-                name="costPerItem"
-                value={formData.costPerItem}
-                onChange={handleChange}
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              {errors.costPerItem && <p className="text-red-500 text-xs mt-1">{errors.costPerItem}</p>}
-            </div>
-
-            {/* Total (Auto-calculated) */}
-            <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">Total Value:</span>
-                <span className="text-lg font-semibold text-gray-900">
-                  ${total.toFixed(2)}
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Calculated as: Quantity on Hand × Cost per Item
-              </p>
             </div>
 
             {/* Submit Error */}

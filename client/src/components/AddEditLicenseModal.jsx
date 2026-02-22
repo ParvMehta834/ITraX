@@ -5,9 +5,11 @@ import licensesService from '../services/licensesService';
 export default function AddEditLicenseModal({ isOpen, onClose, onSuccess, license = null }) {
   const [formData, setFormData] = useState({
     name: '',
+    licenseKey: '',
+    vendor: '',
     seats: '',
-    renewalDate: '',
-    cost: ''
+    expirationDate: '',
+    status: 'Active'
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -15,21 +17,25 @@ export default function AddEditLicenseModal({ isOpen, onClose, onSuccess, licens
   // Populate form when editing
   useEffect(() => {
     if (license) {
-      const renewalDateStr = license.renewalDate
-        ? new Date(license.renewalDate).toISOString().split('T')[0]
+      const expirationDateStr = license.expirationDate
+        ? new Date(license.expirationDate).toISOString().split('T')[0]
         : '';
       setFormData({
         name: license.name || '',
+        licenseKey: license.licenseKey || '',
+        vendor: license.vendor || '',
         seats: license.seats || '',
-        renewalDate: renewalDateStr,
-        cost: license.cost || ''
+        expirationDate: expirationDateStr,
+        status: license.status || 'Active'
       });
     } else {
       setFormData({
         name: '',
+        licenseKey: '',
+        vendor: '',
         seats: '',
-        renewalDate: '',
-        cost: ''
+        expirationDate: '',
+        status: 'Active'
       });
     }
     setErrors({});
@@ -51,16 +57,16 @@ export default function AddEditLicenseModal({ isOpen, onClose, onSuccess, licens
       newErrors.name = 'License name is required';
     }
 
+    if (!formData.licenseKey.trim()) {
+      newErrors.licenseKey = 'License key is required';
+    }
+
     if (!formData.seats || formData.seats < 1) {
       newErrors.seats = 'Number of seats must be at least 1';
     }
 
-    if (!formData.renewalDate) {
-      newErrors.renewalDate = 'Renewal date is required';
-    }
-
-    if (formData.cost === '' || formData.cost < 0) {
-      newErrors.cost = 'Cost must be 0 or greater';
+    if (!formData.expirationDate) {
+      newErrors.expirationDate = 'Expiration date is required';
     }
 
     setErrors(newErrors);
@@ -76,9 +82,11 @@ export default function AddEditLicenseModal({ isOpen, onClose, onSuccess, licens
     try {
       const data = {
         name: formData.name.trim(),
+        licenseKey: formData.licenseKey.trim(),
+        vendor: formData.vendor.trim() || undefined,
         seats: parseInt(formData.seats, 10),
-        renewalDate: formData.renewalDate,
-        cost: parseFloat(formData.cost)
+        expirationDate: formData.expirationDate,
+        status: formData.status
       };
 
       if (license) {
@@ -138,56 +146,86 @@ export default function AddEditLicenseModal({ isOpen, onClose, onSuccess, licens
               {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
             </div>
 
-            {/* Seats */}
+            {/* License Key */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Number of Seats *
+                License Key *
               </label>
               <input
-                type="number"
-                name="seats"
-                value={formData.seats}
+                type="text"
+                name="licenseKey"
+                value={formData.licenseKey}
                 onChange={handleChange}
-                min="1"
-                step="1"
-                placeholder="0"
+                placeholder="Enter license key"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {errors.seats && <p className="text-red-500 text-xs mt-1">{errors.seats}</p>}
+              {errors.licenseKey && <p className="text-red-500 text-xs mt-1">{errors.licenseKey}</p>}
             </div>
 
-            {/* Renewal Date & Cost Row */}
+            {/* Vendor */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Vendor
+              </label>
+              <input
+                type="text"
+                name="vendor"
+                value={formData.vendor}
+                onChange={handleChange}
+                placeholder="e.g., Microsoft, Adobe"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Seats & Expiration Date Row */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Renewal Date *
+                  Number of Seats *
                 </label>
                 <input
-                  type="date"
-                  name="renewalDate"
-                  value={formData.renewalDate}
+                  type="number"
+                  name="seats"
+                  value={formData.seats}
                   onChange={handleChange}
+                  min="1"
+                  step="1"
+                  placeholder="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                {errors.renewalDate && <p className="text-red-500 text-xs mt-1">{errors.renewalDate}</p>}
+                {errors.seats && <p className="text-red-500 text-xs mt-1">{errors.seats}</p>}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  License Cost ($) *
+                  Expiration Date *
                 </label>
                 <input
-                  type="number"
-                  name="cost"
-                  value={formData.cost}
+                  type="date"
+                  name="expirationDate"
+                  value={formData.expirationDate}
                   onChange={handleChange}
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                {errors.cost && <p className="text-red-500 text-xs mt-1">{errors.cost}</p>}
+                {errors.expirationDate && <p className="text-red-500 text-xs mt-1">{errors.expirationDate}</p>}
               </div>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Active">Active</option>
+                <option value="Expiring Soon">Expiring Soon</option>
+                <option value="Expired">Expired</option>
+              </select>
             </div>
 
             {/* Submit Error */}

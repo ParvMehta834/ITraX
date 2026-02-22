@@ -7,6 +7,7 @@ const notifications = [];
 const categories = [];
 const locations = [];
 const employees = [];
+const orders = [];
 
 class MockDB {
   static getUsers() {
@@ -265,6 +266,42 @@ class MockDB {
     return null;
   }
 
+  // Orders
+  static getOrders() {
+    return orders;
+  }
+
+  static getOrderById(id) {
+    return orders.find(o => o._id === id);
+  }
+
+  static createOrder(data) {
+    const order = {
+      _id: `order_${Date.now()}`,
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    orders.push(order);
+    return order;
+  }
+
+  static updateOrder(id, updates) {
+    const order = orders.find(o => o._id === id);
+    if (order) {
+      Object.assign(order, updates, { updatedAt: new Date() });
+    }
+    return order;
+  }
+
+  static deleteOrder(id) {
+    const index = orders.findIndex(o => o._id === id);
+    if (index > -1) {
+      return orders.splice(index, 1)[0];
+    }
+    return null;
+  }
+
   // Clear all (useful for testing)
   static clear() {
     users.length = 0;
@@ -275,6 +312,7 @@ class MockDB {
     categories.length = 0;
     locations.length = 0;
     employees.length = 0;
+    orders.length = 0;
   }
 }
 
