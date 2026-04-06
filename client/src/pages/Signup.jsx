@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { safeJson } from '../utils/safeJson'
+import { buildApiUrl } from '../utils/apiUrl'
 
 export default function Signup({ onSignup }) {
   const [email, setEmail] = useState('')
@@ -33,7 +34,7 @@ export default function Signup({ onSignup }) {
     }
     
     try {
-      const res = await fetch('/api/auth/signup', {
+      const res = await fetch(buildApiUrl('/auth/signup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), password })
