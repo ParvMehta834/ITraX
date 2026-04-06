@@ -37,6 +37,7 @@ export default function Signup({ onSignup }) {
       const res = await fetch(buildApiUrl('/auth/signup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), password })
       })
       

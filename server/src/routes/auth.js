@@ -7,6 +7,13 @@ const { isConnected } = require('../config/db');
 const { authMiddleware } = require('../middleware/auth');
 
 const DEFAULT_ORG_ID = process.env.DEFAULT_ORG_ID || '000000000000000000000001';
+const isProduction = process.env.NODE_ENV === 'production';
+const refreshCookieOptions = {
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? 'none' : 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
 
 const router = express.Router();
 
@@ -30,7 +37,7 @@ router.post('/signup', async (req, res) => {
     });
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'change_me', { expiresIn: '15m' });
     const refresh = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET || (process.env.JWT_SECRET || 'change_me') + '_refresh', { expiresIn: '7d' });
-    res.cookie('refreshToken', refresh, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('refreshToken', refresh, refreshCookieOptions);
     res.json({ token, user: { id: user._id, email: user.email, role: user.role, employeeCode: user.employeeCode || '', firstName, lastName, name: `${firstName} ${lastName}`, orgId: user.orgId } });
   } catch (err) {
     console.error('Signup error:', err);
@@ -67,7 +74,7 @@ router.post('/login', async (req, res) => {
 
       const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'change_me', { expiresIn: '15m' });
       const refresh = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET || (process.env.JWT_SECRET || 'change_me') + '_refresh', { expiresIn: '7d' });
-      res.cookie('refreshToken', refresh, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
+      res.cookie('refreshToken', refresh, refreshCookieOptions);
       return res.json({ token, user: { id: user._id, email: user.email, role: user.role, employeeCode: user.employeeCode || '', firstName: user.firstName, lastName: user.lastName, name: `${user.firstName} ${user.lastName}`, orgId: user.orgId } });
     }
 
@@ -89,7 +96,7 @@ router.post('/login', async (req, res) => {
 
       const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'change_me', { expiresIn: '15m' });
       const refresh = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET || (process.env.JWT_SECRET || 'change_me') + '_refresh', { expiresIn: '7d' });
-      res.cookie('refreshToken', refresh, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
+      res.cookie('refreshToken', refresh, refreshCookieOptions);
       return res.json({ token, user: { id: user._id, email: user.email, role: user.role, employeeCode: user.employeeCode || '', firstName: user.firstName, lastName: user.lastName, name: `${user.firstName} ${user.lastName}`, orgId: user.orgId } });
     }
 
@@ -111,7 +118,7 @@ router.post('/login', async (req, res) => {
 
       const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'change_me', { expiresIn: '15m' });
       const refresh = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET || (process.env.JWT_SECRET || 'change_me') + '_refresh', { expiresIn: '7d' });
-      res.cookie('refreshToken', refresh, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
+      res.cookie('refreshToken', refresh, refreshCookieOptions);
       return res.json({ token, user: { id: user._id, email: user.email, role: user.role, employeeCode: user.employeeCode || '', firstName: user.firstName, lastName: user.lastName, name: `${user.firstName} ${user.lastName}`, orgId: user.orgId } });
     }
 
@@ -124,7 +131,7 @@ router.post('/login', async (req, res) => {
     }
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'change_me', { expiresIn: '15m' });
     const refresh = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET || (process.env.JWT_SECRET || 'change_me') + '_refresh', { expiresIn: '7d' });
-    res.cookie('refreshToken', refresh, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('refreshToken', refresh, refreshCookieOptions);
     res.json({ token, user: { id: user._id, email: user.email, role: user.role, employeeCode: user.employeeCode || '', firstName: user.firstName, lastName: user.lastName, name: `${user.firstName} ${user.lastName}`, orgId: user.orgId } });
   } catch (err) {
     console.error('Login error:', err);
@@ -197,7 +204,11 @@ router.post('/refresh', async (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  res.clearCookie('refreshToken');
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: refreshCookieOptions.secure,
+    sameSite: refreshCookieOptions.sameSite,
+  });
   res.json({ ok: true });
 });
 

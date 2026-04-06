@@ -27,6 +27,7 @@ export default function Login({ onLogin }) {
       const res = await fetch(buildApiUrl('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email: email.trim(), password })
       })
       

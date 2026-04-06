@@ -1,6 +1,15 @@
-  import axios from 'axios';
+import axios from 'axios';
+import { buildApiUrl } from '../utils/apiUrl';
 
-const apiClient = axios.create();
+const apiClient = axios.create({
+  withCredentials: true
+});
+
+const rawApiBase = buildApiUrl('/');
+const apiBase = rawApiBase.replace(/\/api\/?$/i, '');
+if (/^https?:\/\//i.test(apiBase)) {
+  apiClient.defaults.baseURL = apiBase;
+}
 
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('itrax_token');
@@ -26,7 +35,7 @@ apiClient.interceptors.response.use(
 
     config._retry = true;
     try {
-      const refreshResponse = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
+      const refreshResponse = await apiClient.post(buildApiUrl('/auth/refresh'), {}, { withCredentials: true });
       const newToken = refreshResponse?.data?.token;
       if (!newToken) throw new Error('Refresh did not return a token');
       localStorage.setItem('itrax_token', newToken);
