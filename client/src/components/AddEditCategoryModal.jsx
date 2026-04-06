@@ -5,7 +5,10 @@ import categoriesService from '../services/categoriesService';
 export default function AddEditCategoryModal({ isOpen, onClose, onSuccess, category = null }) {
   const [formData, setFormData] = useState({
     name: '',
-    description: ''
+    description: '',
+    totalAssets: 0,
+    availableAssets: 0,
+    assignedAssets: 0
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -14,12 +17,18 @@ export default function AddEditCategoryModal({ isOpen, onClose, onSuccess, categ
     if (category) {
       setFormData({
         name: category.name || '',
-        description: category.description || ''
+        description: category.description || '',
+        totalAssets: Number(category.totalAssets || 0),
+        availableAssets: Number(category.availableAssets || 0),
+        assignedAssets: Number(category.assignedAssets || 0)
       });
     } else {
       setFormData({
         name: '',
-        description: ''
+        description: '',
+        totalAssets: 0,
+        availableAssets: 0,
+        assignedAssets: 0
       });
     }
     setErrors({});
@@ -38,6 +47,15 @@ export default function AddEditCategoryModal({ isOpen, onClose, onSuccess, categ
     if (!formData.name.trim()) {
       newErrors.name = 'Category name is required';
     }
+    if (Number(formData.totalAssets) < 0) {
+      newErrors.totalAssets = 'Total assets cannot be negative';
+    }
+    if (Number(formData.availableAssets) < 0) {
+      newErrors.availableAssets = 'Available assets cannot be negative';
+    }
+    if (Number(formData.assignedAssets) < 0) {
+      newErrors.assignedAssets = 'Assigned assets cannot be negative';
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -50,7 +68,10 @@ export default function AddEditCategoryModal({ isOpen, onClose, onSuccess, categ
     try {
       const data = {
         name: formData.name.trim(),
-        description: formData.description.trim()
+        description: formData.description.trim(),
+        totalAssets: Number(formData.totalAssets) || 0,
+        availableAssets: Number(formData.availableAssets) || 0,
+        assignedAssets: Number(formData.assignedAssets) || 0
       };
 
       if (category) {
@@ -115,6 +136,45 @@ export default function AddEditCategoryModal({ isOpen, onClose, onSuccess, categ
               rows="3"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Total Assets</label>
+              <input
+                type="number"
+                name="totalAssets"
+                min="0"
+                value={formData.totalAssets}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {errors.totalAssets && <p className="text-red-500 text-xs mt-1">{errors.totalAssets}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Available</label>
+              <input
+                type="number"
+                name="availableAssets"
+                min="0"
+                value={formData.availableAssets}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {errors.availableAssets && <p className="text-red-500 text-xs mt-1">{errors.availableAssets}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Assigned</label>
+              <input
+                type="number"
+                name="assignedAssets"
+                min="0"
+                value={formData.assignedAssets}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {errors.assignedAssets && <p className="text-red-500 text-xs mt-1">{errors.assignedAssets}</p>}
+            </div>
           </div>
 
           {errors.submit && (

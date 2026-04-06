@@ -71,7 +71,7 @@ export default function AdminAssets() {
     }, 500);
     setSearchDebounce(timer);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, filters]);
 
   // Initial fetch
   useEffect(() => {

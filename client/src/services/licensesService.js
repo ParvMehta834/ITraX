@@ -21,21 +21,21 @@ const licensesService = {
   getLicenseById: (id) => {
     return apiClient.get(`${API_URL}/${id}`, {
       headers: getAuthHeader()
-    }).then(res => res.data.data);
+    }).then(res => res.data?.data ?? res.data);
   },
 
   // Create new license
   createLicense: (licenseData) => {
     return apiClient.post(API_URL, licenseData, {
       headers: getAuthHeader()
-    }).then(res => res.data.data);
+    }).then(res => res.data?.data ?? res.data);
   },
 
   // Update license
   updateLicense: (id, licenseData) => {
     return apiClient.put(`${API_URL}/${id}`, licenseData, {
       headers: getAuthHeader()
-    }).then(res => res.data.data);
+    }).then(res => res.data?.data ?? res.data);
   },
 
   // Delete license

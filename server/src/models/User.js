@@ -24,6 +24,9 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Email is required'],
   },
+  employeeCode: {
+    type: String,
+  },
   phone: String,
   passwordHash: {
     type: String,
@@ -48,6 +51,7 @@ const UserSchema = new mongoose.Schema({
 
 // Unique compound index: orgId + email
 UserSchema.index({ orgId: 1, email: 1 }, { unique: true });
+UserSchema.index({ orgId: 1, employeeCode: 1 }, { unique: true, sparse: true });
 
 UserSchema.methods.comparePassword = function (candidate) {
   return bcrypt.compare(candidate, this.passwordHash);

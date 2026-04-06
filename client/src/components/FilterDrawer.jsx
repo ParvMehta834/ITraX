@@ -7,6 +7,12 @@ export default function FilterDrawer({
   categories = [],
   locations = []
 }) {
+  const defaultFilters = {
+    status: 'all',
+    category: '',
+    location: ''
+  };
+
   const [filters, setFilters] = useState({
     status: 'all',
     category: '',
@@ -24,7 +30,8 @@ export default function FilterDrawer({
   };
 
   const handleReset = () => {
-    setFilters({ status: 'all', category: '', location: '' });
+    setFilters(defaultFilters);
+    onApply(defaultFilters);
   };
 
   if (!isOpen) return null;
@@ -62,7 +69,7 @@ export default function FilterDrawer({
               name="status"
               value={filters.status}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Status</option>
               <option value="Available">Available</option>

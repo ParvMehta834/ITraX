@@ -33,6 +33,12 @@ const categoryController = {
         });
       } else {
         const categories = MockDB.getCategories();
+        if (categories.length === 0) {
+          MockDB.createCategory({ name: 'Laptop', description: 'Portable computers' });
+          MockDB.createCategory({ name: 'Desktop', description: 'Desktop systems' });
+          MockDB.createCategory({ name: 'Networking', description: 'Routers and switches' });
+          MockDB.createCategory({ name: 'Accessories', description: 'Peripherals and accessories' });
+        }
         let filtered = categories;
 
         if (search) {
@@ -66,7 +72,7 @@ const categoryController = {
 
   createCategory: async (req, res) => {
     try {
-      const { name, description } = req.body;
+      const { name, description, totalAssets, availableAssets, assignedAssets } = req.body;
 
       if (!name) {
         return res.status(400).json({ message: 'Category name is required' });
@@ -74,13 +80,24 @@ const categoryController = {
 
       if (isConnected()) {
         const category = await Category.create({
+          orgId: req.user.orgId,
           name,
           description,
+          totalAssets: Number(totalAssets) || 0,
+          availableAssets: Number(availableAssets) || 0,
+          assignedAssets: Number(assignedAssets) || 0,
+          createdBy: req.user._id,
           createdAt: new Date()
         });
         res.status(201).json(category);
       } else {
-        const category = MockDB.createCategory({ name, description });
+        const category = MockDB.createCategory({
+          name,
+          description,
+          totalAssets: Number(totalAssets) || 0,
+          availableAssets: Number(availableAssets) || 0,
+          assignedAssets: Number(assignedAssets) || 0
+        });
         res.status(201).json(category);
       }
     } catch (error) {
@@ -111,7 +128,12 @@ const categoryController = {
   updateCategory: async (req, res) => {
     try {
       const { id } = req.params;
-      const updates = req.body;
+      const updates = {
+        ...req.body,
+        ...(req.body.totalAssets !== undefined ? { totalAssets: Number(req.body.totalAssets) || 0 } : {}),
+        ...(req.body.availableAssets !== undefined ? { availableAssets: Number(req.body.availableAssets) || 0 } : {}),
+        ...(req.body.assignedAssets !== undefined ? { assignedAssets: Number(req.body.assignedAssets) || 0 } : {}),
+      };
 
       if (isConnected()) {
         const category = await Category.findByIdAndUpdate(id, { ...updates, updatedAt: new Date() }, { new: true }).lean();

@@ -33,8 +33,7 @@ export default function Signup({ onSignup }) {
     }
     
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '/api'
-      const res = await fetch(`${apiUrl}/auth/signup`, {
+      const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), password })
@@ -57,7 +56,7 @@ export default function Signup({ onSignup }) {
     } catch (err) {
       console.error('Signup error:', err)
       if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
-        setErr('Cannot connect to server. Make sure the backend is running on http://localhost:4000')
+        setErr('Cannot connect to server. Please make sure backend is running.')
       } else {
         setErr(err.message || 'Network error - please try again')
       }
@@ -67,6 +66,22 @@ export default function Signup({ onSignup }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="w-full max-w-md bg-white shadow-lg rounded-lg p-8 border border-gray-200">
+        <div className="flex justify-end gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => nav('/')}
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+          >
+            Home
+          </button>
+          <button
+            type="button"
+            onClick={() => nav('/login')}
+            className="px-3 py-1.5 text-sm border border-blue-300 rounded-md text-blue-700 hover:bg-blue-50"
+          >
+            Login
+          </button>
+        </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Create Account</h2>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">

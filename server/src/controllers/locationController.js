@@ -68,7 +68,7 @@ const locationController = {
 
   createLocation: async (req, res) => {
     try {
-      const { name, address, city, country, status } = req.body;
+      const { name, type, address, city, state, country, capacity, status } = req.body;
 
       if (!name) {
         return res.status(400).json({ message: 'Location name is required' });
@@ -76,11 +76,16 @@ const locationController = {
 
       if (isConnected()) {
         const location = await Location.create({
+          orgId: req.user.orgId,
           name,
+          type: type || 'Office',
           address,
           city,
+          state,
           country,
+          capacity: Number.isFinite(Number(capacity)) ? Number(capacity) : 0,
           status: status || 'Active',
+          createdBy: req.user._id,
           createdAt: new Date()
         });
         res.status(201).json(location);

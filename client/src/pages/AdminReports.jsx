@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, Eye, ChevronDown } from 'lucide-react';
 import reportsService from '../services/reportsService';
 
@@ -6,6 +6,12 @@ export default function AdminReports() {
   const [expandedReport, setExpandedReport] = useState(null);
   const [reportData, setReportData] = useState({});
   const [loading, setLoading] = useState(null);
+  const [issues, setIssues] = useState([]);
+  const [issuesLoading, setIssuesLoading] = useState(false);
+  const [feedbackModal, setFeedbackModal] = useState(null);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackStatus, setFeedbackStatus] = useState('OPEN');
+  const [savingFeedback, setSavingFeedback] = useState(false);
   const [toast, setToast] = useState(null);
 
   const reports = [
@@ -52,6 +58,22 @@ export default function AdminReports() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const fetchIssueReports = async () => {
+    setIssuesLoading(true);
+    try {
+      const payload = await reportsService.getIssueReports();
+      setIssues(payload?.data || []);
+    } catch (error) {
+      showToast(error.response?.data?.message || 'Failed to load employee reports', 'error');
+    } finally {
+      setIssuesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchIssueReports();
+  }, []);
+
   const handlePreview = async (reportId) => {
     setLoading(reportId);
     try {
@@ -94,6 +116,37 @@ export default function AdminReports() {
       if (!reportData[reportId]) {
         handlePreview(reportId);
       }
+    }
+  };
+
+  const openFeedback = (issue) => {
+    setFeedbackModal(issue);
+    setFeedbackText(issue.adminFeedback || '');
+    setFeedbackStatus(issue.status || 'OPEN');
+  };
+
+  const submitFeedback = async () => {
+    if (!feedbackModal) return;
+    if (!feedbackText.trim()) {
+      showToast('Please write feedback first', 'error');
+      return;
+    }
+
+    setSavingFeedback(true);
+    try {
+      await reportsService.updateIssueFeedback(feedbackModal._id, {
+        adminFeedback: feedbackText.trim(),
+        status: feedbackStatus
+      });
+      showToast('Feedback updated successfully', 'success');
+      setFeedbackModal(null);
+      setFeedbackText('');
+      setFeedbackStatus('OPEN');
+      fetchIssueReports();
+    } catch (error) {
+      showToast(error.response?.data?.message || 'Failed to save feedback', 'error');
+    } finally {
+      setSavingFeedback(false);
     }
   };
 
@@ -235,6 +288,107 @@ export default function AdminReports() {
           </div>
         ))}
       </div>
+
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h2 className="text-xl font-semibold text-gray-900">Employee Submitted Reports</h2>
+        <p className="text-sm text-gray-600 mt-1">All employee issue descriptions appear here. You can mark them solved and send feedback.</p>
+
+        <div className="mt-4 rounded-lg border border-gray-200 overflow-x-auto">
+          {issuesLoading ? (
+            <div className="p-6 text-sm text-gray-500">Loading employee reports...</div>
+          ) : issues.length === 0 ? (
+            <div className="p-6 text-sm text-gray-500">No employee reports yet.</div>
+          ) : (
+            <table className="w-full min-w-[980px] text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium text-gray-700">Employee</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-700">Email</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-700">Description</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-700">Status</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-700">Feedback</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-700">Submitted</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-700">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {issues.map((issue) => (
+                  <tr key={issue._id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-900 font-medium">{issue.employeeName || 'Employee'}</td>
+                    <td className="px-4 py-3 text-gray-600">{issue.employeeEmail || '—'}</td>
+                    <td className="px-4 py-3 text-gray-900 max-w-[320px] whitespace-pre-wrap">{issue.description}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${issue.status === 'SOLVED' ? 'bg-green-100' : 'bg-amber-100'} text-gray-900`}>
+                        {issue.status === 'SOLVED' ? 'Solved' : 'Open'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-900 max-w-[250px] whitespace-pre-wrap">{issue.adminFeedback || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{issue.createdAt ? new Date(issue.createdAt).toLocaleString() : '—'}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => openFeedback(issue)}
+                        className="px-3 py-1.5 rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-medium"
+                      >
+                        Edit Feedback
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {feedbackModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-xl p-6">
+            <h3 className="text-lg font-semibold text-gray-900">Update Employee Report</h3>
+            <p className="text-sm text-gray-600 mt-1">{feedbackModal.employeeName} - {feedbackModal.employeeEmail}</p>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={feedbackStatus}
+                  onChange={(e) => setFeedbackStatus(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="OPEN">Open</option>
+                  <option value="SOLVED">Solved</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Admin Feedback</label>
+                <textarea
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                  rows={4}
+                  placeholder="Write feedback for employee"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setFeedbackModal(null)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitFeedback}
+                disabled={savingFeedback}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {savingFeedback ? 'Saving...' : 'Save Feedback'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className={`fixed bottom-4 right-4 px-4 py-3 rounded-md text-white text-sm z-40 ${toast.type === 'success' ? 'bg-green-600' : toast.type === 'error' ? 'bg-red-600' : 'bg-blue-600'}`}>

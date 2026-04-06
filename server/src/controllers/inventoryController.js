@@ -70,30 +70,46 @@ const inventoryController = {
     try {
       const { name, description, quantity, location, sku, reorderLevel } = req.body;
 
-      if (!name || !quantity) {
+      if (!name || quantity === undefined || quantity === null || quantity === '') {
         return res.status(400).json({ message: 'Name and quantity are required' });
       }
 
       if (isConnected()) {
         const item = await InventoryItem.create({
+          orgId: req.user.orgId,
           name,
-          description,
-          quantity,
+          quantityOnHand: Number(quantity) || 0,
+          quantityMinimum: Number(reorderLevel) || 0,
+          costPerItem: Number(req.body.costPerItem) || 0,
           location,
-          sku,
-          reorderLevel,
+          createdBy: req.user._id,
           createdAt: new Date()
         });
         res.status(201).json(item);
       } else {
-        const item = MockDB.createInventoryItem({
+        const payload = {
           name,
           description,
-          quantity,
+          quantityOnHand: Number(quantity) || 0,
+          quantityMinimum: Number(reorderLevel) || 0,
+          costPerItem: Number(req.body.costPerItem) || 0,
           location,
           sku,
           reorderLevel
-        });
+        };
+
+        const item = typeof MockDB.createInventoryItem === 'function'
+          ? MockDB.createInventoryItem(payload)
+          : (() => {
+            const fallback = {
+              _id: `inv_${Date.now()}`,
+              ...payload,
+              total: (Number(payload.quantityOnHand) || 0) * (Number(payload.costPerItem) || 0),
+              createdAt: new Date()
+            };
+            MockDB.getInventoryItems().push(fallback);
+            return fallback;
+          })();
         res.status(201).json(item);
       }
     } catch (error) {

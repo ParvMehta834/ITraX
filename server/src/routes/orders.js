@@ -4,6 +4,7 @@ const CompanyOrder = require('../models/CompanyOrder');
 const MockDB = require('../config/mockDb');
 const { isConnected } = require('../config/db');
 const { Parser } = require('json2csv');
+const User = require('../models/User');
 
 const router = express.Router();
 
@@ -15,10 +16,25 @@ const validateOrder = (data) => {
   if (!data.supplier) errors.supplier = 'Supplier is required';
   if (!data.estimatedDelivery) errors.estimatedDelivery = 'Estimated delivery date is required';
   if (!data.currentLocation) errors.currentLocation = 'Current location is required';
+  if (!data.assignedEmployeeId && !data.assignedEmployeeName) {
+    errors.assignedEmployee = 'Assigned employee name or id is required';
+  }
   if (data.status && !['Ordered', 'Processing', 'Shipped', 'InTransit', 'OutForDelivery', 'Delivered'].includes(data.status)) {
     errors.status = 'Invalid status';
   }
   return errors;
+};
+
+const normalizeOrgId = (orgId) => String(orgId || '');
+
+const userOwnsOrder = (order, user) => {
+  if (!order || !user) return false;
+  const userId = String(user._id || user.id || '');
+  const orderAssignedUserId = String(order.assignedEmployeeId?._id || order.assignedEmployeeId || '');
+  if (orderAssignedUserId && userId && orderAssignedUserId === userId) return true;
+  if (order.assignedEmployeeCode && user.employeeCode && String(order.assignedEmployeeCode) === String(user.employeeCode)) return true;
+  const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim().toLowerCase();
+  return Boolean(fullName) && String(order.assignedEmployeeName || '').trim().toLowerCase() === fullName;
 };
 
 // Generate unique order ID
@@ -39,14 +55,25 @@ router.get('/', authMiddleware, async (req, res) => {
     if (isConnected()) {
       // Build filter
       const filter = {};
+      if (req.user?.orgId) filter.orgId = req.user.orgId;
       if (search) {
         filter.$or = [
           { orderId: { $regex: search, $options: 'i' } },
           { assetName: { $regex: search, $options: 'i' } },
-          { supplier: { $regex: search, $options: 'i' } }
+          { supplier: { $regex: search, $options: 'i' } },
+          { assignedEmployeeName: { $regex: search, $options: 'i' } },
+          { assignedEmployeeCode: { $regex: search, $options: 'i' } }
         ];
       }
       if (status) filter.status = status;
+
+      if (req.user?.role === 'EMPLOYEE') {
+        filter.$or = [
+          { assignedEmployeeId: req.user._id },
+          { assignedEmployeeCode: req.user.employeeCode || '__NO_CODE__' },
+          { assignedEmployeeName: `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() }
+        ];
+      }
 
       const total = await CompanyOrder.countDocuments(filter);
       const data = await CompanyOrder.find(filter)
@@ -65,14 +92,64 @@ router.get('/', authMiddleware, async (req, res) => {
       });
     } else {
       // Use mock database
-      let allOrders = MockDB.getOrders();
+      let allOrders = MockDB.getOrders().filter((order) => {
+        if (!req.user?.orgId) return true;
+        return normalizeOrgId(order.orgId || req.user.orgId) === normalizeOrgId(req.user.orgId);
+      });
+
+      if (allOrders.length === 0) {
+        let demoEmployee = MockDB.getUsers().find((u) => u.role === 'EMPLOYEE');
+        if (!demoEmployee) {
+          demoEmployee = MockDB.createUser({
+            orgId: req.user.orgId,
+            role: 'EMPLOYEE',
+            firstName: 'Rahul',
+            lastName: 'Sharma',
+            employeeCode: '100001',
+            email: 'rahul@itrax.local',
+            passwordHash: req.user.passwordHash || '',
+            status: 'ACTIVE'
+          });
+        }
+        const demoName = `${demoEmployee.firstName || ''} ${demoEmployee.lastName || ''}`.trim() || 'Employee';
+        MockDB.createOrder({
+          orgId: req.user.orgId,
+          orderId: `ORD-${String(Date.now()).slice(-6)}-1`,
+          assetName: 'ThinkPad E14',
+          quantity: 1,
+          supplier: 'Lenovo',
+          assignedEmployeeId: demoEmployee._id,
+          assignedEmployeeCode: demoEmployee.employeeCode || '',
+          assignedEmployeeName: demoName,
+          orderDate: new Date(),
+          estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+          currentLocation: 'Warehouse',
+          status: 'Processing',
+          trackingHistory: [
+            { stage: 'Ordered', date: new Date() },
+            { stage: 'Processing', date: new Date() }
+          ],
+          notes: 'Demo seeded order'
+        });
+
+        allOrders = MockDB.getOrders().filter((order) => {
+          if (!req.user?.orgId) return true;
+          return normalizeOrgId(order.orgId || req.user.orgId) === normalizeOrgId(req.user.orgId);
+        });
+      }
+
+      if (req.user?.role === 'EMPLOYEE') {
+        allOrders = allOrders.filter((order) => userOwnsOrder(order, req.user));
+      }
       
       if (search) {
         const searchLower = search.toLowerCase();
         allOrders = allOrders.filter(o =>
           o.orderId?.toLowerCase().includes(searchLower) ||
           o.assetName?.toLowerCase().includes(searchLower) ||
-          o.supplier?.toLowerCase().includes(searchLower)
+          o.supplier?.toLowerCase().includes(searchLower) ||
+          o.assignedEmployeeName?.toLowerCase().includes(searchLower) ||
+          o.assignedEmployeeCode?.toLowerCase().includes(searchLower)
         );
       }
       if (status) {
@@ -102,11 +179,29 @@ router.get('/', authMiddleware, async (req, res) => {
 // POST /api/orders - Create order (Admin only)
 router.post('/', authMiddleware, requireRole('ADMIN'), async (req, res) => {
   try {
-    const { orderId, assetName, quantity, supplier, orderDate, estimatedDelivery, currentLocation, status, notes } = req.body;
+    const { orderId, assetName, quantity, supplier, orderDate, estimatedDelivery, currentLocation, status, notes, assignedEmployeeId, assignedEmployeeName } = req.body;
 
-    const errors = validateOrder({ assetName, quantity, supplier, estimatedDelivery, currentLocation, status });
+    const errors = validateOrder({ assetName, quantity, supplier, estimatedDelivery, currentLocation, status, assignedEmployeeId, assignedEmployeeName });
     if (Object.keys(errors).length > 0) {
       return res.status(400).json({ message: 'Validation error', errors });
+    }
+
+    let resolvedEmployeeId = null;
+    let resolvedEmployeeCode = '';
+    let resolvedEmployeeName = (assignedEmployeeName || '').trim();
+
+    if (assignedEmployeeId) {
+      const assignedUser = isConnected()
+        ? await User.findById(assignedEmployeeId).select('_id firstName lastName employeeCode role orgId').lean()
+        : MockDB.getUsers().find((u) => String(u._id) === String(assignedEmployeeId));
+
+      if (!assignedUser) {
+        return res.status(400).json({ message: 'Assigned employee not found' });
+      }
+
+      resolvedEmployeeId = assignedUser._id;
+      resolvedEmployeeCode = assignedUser.employeeCode || '';
+      resolvedEmployeeName = `${assignedUser.firstName || ''} ${assignedUser.lastName || ''}`.trim() || resolvedEmployeeName;
     }
 
     if (isConnected()) {
@@ -127,10 +222,14 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req, res) => {
       ];
 
       const order = await CompanyOrder.create({
+        orgId: req.user.orgId,
         orderId: finalOrderId,
         assetName,
         quantity,
         supplier,
+        assignedEmployeeId: resolvedEmployeeId,
+        assignedEmployeeCode: resolvedEmployeeCode,
+        assignedEmployeeName: resolvedEmployeeName,
         orderDate: orderDate ? new Date(orderDate) : new Date(),
         estimatedDelivery: new Date(estimatedDelivery),
         currentLocation,
@@ -161,10 +260,14 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req, res) => {
       ];
 
       const order = MockDB.createOrder({
+        orgId: req.user.orgId,
         orderId: finalOrderId,
         assetName,
         quantity,
         supplier,
+        assignedEmployeeId: resolvedEmployeeId,
+        assignedEmployeeCode: resolvedEmployeeCode,
+        assignedEmployeeName: resolvedEmployeeName,
         orderDate: orderDate ? new Date(orderDate) : new Date(),
         estimatedDelivery: new Date(estimatedDelivery),
         currentLocation,
@@ -212,17 +315,35 @@ router.get('/:id', authMiddleware, async (req, res) => {
 // PUT /api/orders/:id - Update order (Admin only)
 router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req, res) => {
   try {
-    const { assetName, quantity, supplier, estimatedDelivery, currentLocation, status } = req.body;
+    const { assetName, quantity, supplier, estimatedDelivery, currentLocation, status, assignedEmployeeId, assignedEmployeeName } = req.body;
 
-    const errors = validateOrder({ assetName, quantity, supplier, estimatedDelivery, currentLocation, status });
+    const errors = validateOrder({ assetName, quantity, supplier, estimatedDelivery, currentLocation, status, assignedEmployeeId, assignedEmployeeName });
     if (Object.keys(errors).length > 0) {
       return res.status(400).json({ message: 'Validation error', errors });
+    }
+
+    const updatePayload = { ...req.body };
+    if (assignedEmployeeId) {
+      const assignedUser = isConnected()
+        ? await User.findById(assignedEmployeeId).select('_id firstName lastName employeeCode').lean()
+        : MockDB.getUsers().find((u) => String(u._id) === String(assignedEmployeeId));
+
+      if (!assignedUser) {
+        return res.status(400).json({ message: 'Assigned employee not found' });
+      }
+
+      updatePayload.assignedEmployeeId = assignedUser._id;
+      updatePayload.assignedEmployeeCode = assignedUser.employeeCode || '';
+      updatePayload.assignedEmployeeName = `${assignedUser.firstName || ''} ${assignedUser.lastName || ''}`.trim();
+    } else {
+      updatePayload.assignedEmployeeName = (assignedEmployeeName || '').trim();
+      updatePayload.assignedEmployeeCode = '';
     }
 
     if (isConnected()) {
       const order = await CompanyOrder.findByIdAndUpdate(
         req.params.id,
-        req.body,
+        updatePayload,
         { new: true, runValidators: true }
       ).populate('createdBy', 'firstName lastName email');
 
@@ -232,7 +353,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req, res) => {
 
       res.json({ order });
     } else {
-      const order = MockDB.updateOrder(req.params.id, req.body);
+      const order = MockDB.updateOrder(req.params.id, updatePayload);
       if (!order) {
         return res.status(404).json({ message: 'Order not found' });
       }
@@ -327,7 +448,9 @@ router.get('/export/download', authMiddleware, requireRole('ADMIN'), async (req,
       filter.$or = [
         { orderId: { $regex: search, $options: 'i' } },
         { assetName: { $regex: search, $options: 'i' } },
-        { supplier: { $regex: search, $options: 'i' } }
+        { supplier: { $regex: search, $options: 'i' } },
+        { assignedEmployeeName: { $regex: search, $options: 'i' } },
+        { assignedEmployeeCode: { $regex: search, $options: 'i' } }
       ];
     }
     if (status) filter.status = status;
@@ -338,7 +461,7 @@ router.get('/export/download', authMiddleware, requireRole('ADMIN'), async (req,
       return res.json({ message: 'No orders to export' });
     }
 
-    const fields = ['orderId', 'assetName', 'quantity', 'supplier', 'orderDate', 'estimatedDelivery', 'currentLocation', 'status'];
+    const fields = ['orderId', 'assetName', 'quantity', 'supplier', 'assignedEmployeeCode', 'assignedEmployeeName', 'orderDate', 'estimatedDelivery', 'currentLocation', 'status'];
     const parser = new Parser({ fields });
     const csv = parser.parse(orders);
 

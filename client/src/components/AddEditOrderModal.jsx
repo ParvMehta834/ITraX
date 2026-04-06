@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import orderService from '../services/orderService';
+import employeesService from '../services/employeesService';
 
 export default function AddEditOrderModal({ isOpen, onClose, onSuccess, order = null }) {
   const [formData, setFormData] = useState({
@@ -10,12 +11,15 @@ export default function AddEditOrderModal({ isOpen, onClose, onSuccess, order = 
     orderDate: '',
     estimatedDelivery: '',
     currentLocation: '',
+    assignedEmployeeId: '',
+    assignedEmployeeName: '',
     status: 'Ordered',
     notes: ''
   });
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [employees, setEmployees] = useState([]);
 
   useEffect(() => {
     if (order) {
@@ -27,6 +31,8 @@ export default function AddEditOrderModal({ isOpen, onClose, onSuccess, order = 
         orderDate: order.orderDate ? order.orderDate.split('T')[0] : '',
         estimatedDelivery: order.estimatedDelivery ? order.estimatedDelivery.split('T')[0] : '',
         currentLocation: order.currentLocation || '',
+        assignedEmployeeId: order.assignedEmployeeId?._id || order.assignedEmployeeId || '',
+        assignedEmployeeName: order.assignedEmployeeName || '',
         status: order.status || 'Ordered',
         notes: order.notes || ''
       });
@@ -40,12 +46,28 @@ export default function AddEditOrderModal({ isOpen, onClose, onSuccess, order = 
         orderDate: today,
         estimatedDelivery: '',
         currentLocation: '',
+        assignedEmployeeId: '',
+        assignedEmployeeName: '',
         status: 'Ordered',
         notes: ''
       });
     }
     setErrors({});
   }, [order, isOpen]);
+
+  useEffect(() => {
+    const loadEmployees = async () => {
+      if (!isOpen) return;
+      try {
+        const body = await employeesService.getEmployees({ limit: 200 });
+        setEmployees(body?.data || []);
+      } catch {
+        setEmployees([]);
+      }
+    };
+
+    loadEmployees();
+  }, [isOpen]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -68,6 +90,9 @@ export default function AddEditOrderModal({ isOpen, onClose, onSuccess, order = 
       if (!formData.supplier?.trim()) requiredErrors.supplier = 'Supplier is required';
       if (!formData.estimatedDelivery) requiredErrors.estimatedDelivery = 'Estimated delivery date is required';
       if (!formData.currentLocation?.trim()) requiredErrors.currentLocation = 'Current location is required';
+      if (!formData.assignedEmployeeId && !formData.assignedEmployeeName?.trim()) {
+        requiredErrors.assignedEmployee = 'Assign an employee by ID or name';
+      }
 
       if (Object.keys(requiredErrors).length > 0) {
         setErrors(requiredErrors);
@@ -84,6 +109,8 @@ export default function AddEditOrderModal({ isOpen, onClose, onSuccess, order = 
         orderDate: formData.orderDate || new Date().toISOString(),
         estimatedDelivery: formData.estimatedDelivery,
         currentLocation: formData.currentLocation.trim(),
+        assignedEmployeeId: formData.assignedEmployeeId || undefined,
+        assignedEmployeeName: formData.assignedEmployeeName?.trim() || undefined,
         status: formData.status,
         notes: formData.notes?.trim() || ''
       };
@@ -264,6 +291,41 @@ export default function AddEditOrderModal({ isOpen, onClose, onSuccess, order = 
               />
               {errors.currentLocation && <p className="text-red-500 text-xs mt-1">{errors.currentLocation}</p>}
             </div>
+
+            {/* Assigned Employee */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Assigned Employee ID
+              </label>
+              <select
+                name="assignedEmployeeId"
+                value={formData.assignedEmployeeId}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="">Select employee (or type name below)</option>
+                {employees.map((emp) => (
+                  <option key={emp._id} value={emp._id}>
+                    {(emp.employeeCode || '------')} - {emp.firstName} {emp.lastName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Assigned Employee Name
+              </label>
+              <input
+                type="text"
+                name="assignedEmployeeName"
+                value={formData.assignedEmployeeName}
+                onChange={handleChange}
+                placeholder="Use if employee ID is unavailable"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            {errors.assignedEmployee && <p className="text-red-500 text-xs mt-1 col-span-2">{errors.assignedEmployee}</p>}
 
             {/* Status */}
             <div>

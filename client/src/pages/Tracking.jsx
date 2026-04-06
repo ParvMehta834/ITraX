@@ -67,7 +67,7 @@ export default function TrackingPage() {
     }, 500);
     setSearchDebounce(timer);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, statusFilter]);
 
   // Initial fetch
   useEffect(() => {
@@ -116,9 +116,11 @@ export default function TrackingPage() {
   // Status update handler
   const handleStatusChange = async (orderId, newStatus) => {
     try {
-      await orderService.updateOrderStatus(orderId, newStatus);
+      const updatedOrder = await orderService.updateOrderStatus(orderId, newStatus);
+      setOrders((prev) => prev.map((order) => (
+        order._id === orderId ? { ...order, ...updatedOrder } : order
+      )));
       showToast(`Order marked as ${newStatus}`);
-      fetchOrders(pagination.page);
     } catch (err) {
       showToast('Failed to update status', 'error');
     }
@@ -176,7 +178,7 @@ export default function TrackingPage() {
           {/* Status Filter */}
           <select
             value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); fetchOrders(1); }}
+            onChange={(e) => setStatusFilter(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 bg-white"
           >
             <option value="">All Status</option>

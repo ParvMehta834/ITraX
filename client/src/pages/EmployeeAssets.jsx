@@ -5,7 +5,7 @@ export default function EmployeeAssets(){
   useEffect(()=>{fetchAssets()}, [])
   async function fetchAssets(){
     const token = localStorage.getItem('itrax_token')
-    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/employee/assets`, { headers: { Authorization: `Bearer ${token}` } })
+    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/employee/assets`, { headers: { Authorization: `Bearer ${token}` } })
     if (!res.ok) return setAssets([])
     const data = await res.json()
     setAssets(data.data || [])

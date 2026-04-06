@@ -25,4 +25,10 @@ router.get('/employees', ReportController.getEmployeeReport);
 // Tracking Reports
 router.get('/tracking', ReportController.getTrackingReport);
 
+// Employee issue reporting workflow
+router.post('/issues', ReportController.createEmployeeIssueReport);
+router.get('/issues', ReportController.getEmployeeIssueReports);
+router.put('/issues/:id/feedback', ReportController.updateEmployeeIssueFeedback);
+router.post('/requests', ReportController.createEmployeeResourceRequest);
+
 module.exports = router;

@@ -6,12 +6,25 @@ import AddEditLicenseModal from '../components/AddEditLicenseModal';
 const STATUS_COLORS = {
   'Active': 'bg-blue-100 text-blue-800',
   'Expiring Soon': 'bg-amber-100 text-amber-800',
+  'ExpiringSoon': 'bg-amber-100 text-amber-800',
   'Expired': 'bg-red-100 text-red-800'
 };
 
 const ROW_HIGHLIGHT = {
   'Expiring Soon': 'bg-amber-50',
+  'ExpiringSoon': 'bg-amber-50',
   'Expired': 'bg-red-50'
+};
+
+const formatStatus = (status) => (status === 'ExpiringSoon' ? 'Expiring Soon' : status || 'Active');
+const formatDate = (value) => {
+  if (!value) return '—';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleDateString();
+};
+const formatCost = (value) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? `$${num.toFixed(2)}` : '$0.00';
 };
 
 export default function AdminLicenses() {
@@ -177,11 +190,11 @@ export default function AdminLicenses() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white cursor-pointer"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white text-gray-900 cursor-pointer"
           >
             <option value="all">All Status</option>
             <option value="Active">Active</option>
-            <option value="Expiring Soon">Expiring Soon</option>
+            <option value="ExpiringSoon">Expiring Soon</option>
             <option value="Expired">Expired</option>
           </select>
 
@@ -239,14 +252,14 @@ export default function AdminLicenses() {
                   className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${ROW_HIGHLIGHT[license.status] || ''}`}
                 >
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">{license.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{license.seats}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{license.seatsTotal ?? license.seats ?? 0}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">
-                    {new Date(license.renewalDate).toLocaleDateString()}
+                    {formatDate(license.renewalDate || license.expirationDate)}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">${license.cost.toFixed(2)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{formatCost(license.cost)}</td>
                   <td className="px-6 py-4 text-sm">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[license.status]}`}>
-                      {license.status}
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-gray-900 ${STATUS_COLORS[license.status]}`}>
+                      {formatStatus(license.status)}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center">

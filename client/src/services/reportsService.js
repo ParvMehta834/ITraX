@@ -129,6 +129,26 @@ const reportsService = {
       responseType: 'blob',
       headers: getAuthHeader()
     });
+  },
+
+  // Employee issue reports
+  getIssueReports: (params = {}) => {
+    return apiClient.get(`${API_URL}/issues`, {
+      params,
+      headers: getAuthHeader()
+    }).then(res => res.data);
+  },
+
+  createIssueReport: (payload) => {
+    return apiClient.post(`${API_URL}/issues`, payload, {
+      headers: getAuthHeader()
+    }).then(res => res.data?.data ?? res.data);
+  },
+
+  updateIssueFeedback: (id, payload) => {
+    return apiClient.put(`${API_URL}/issues/${id}/feedback`, payload, {
+      headers: getAuthHeader()
+    }).then(res => res.data?.data ?? res.data);
   }
 };
 

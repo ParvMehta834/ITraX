@@ -10,7 +10,7 @@ const assetController = {
       
       if (isConnected()) {
         // Use MongoDB
-        let query = {};
+        const query = {};
         if (search) {
           query.$or = [
             { name: { $regex: search, $options: 'i' } },
@@ -19,8 +19,10 @@ const assetController = {
           ];
         }
         if (status) query.status = status;
-        if (category) query.category = category;
-        if (location) query.location = location;
+        if (category) query.category = { $regex: category, $options: 'i' };
+        if (location) {
+          query.currentLocation = { $regex: location, $options: 'i' };
+        }
 
         const total = await Asset.countDocuments(query);
         const data = await Asset.find(query)
@@ -51,8 +53,17 @@ const assetController = {
           );
         }
         if (status) filtered = filtered.filter(a => a.status === status);
-        if (category) filtered = filtered.filter(a => a.category === category);
-        if (location) filtered = filtered.filter(a => a.location === location);
+        if (category) {
+          const categoryLower = category.toLowerCase();
+          filtered = filtered.filter(a => String(a.category || '').toLowerCase().includes(categoryLower));
+        }
+        if (location) {
+          const locationLower = location.toLowerCase();
+          filtered = filtered.filter(a => {
+            const assetLocation = String(a.currentLocation || a.location || '').toLowerCase();
+            return assetLocation.includes(locationLower);
+          });
+        }
 
         const total = filtered.length;
         const pageNum = parseInt(page);
@@ -78,7 +89,7 @@ const assetController = {
   // Create new asset
   createAsset: async (req, res) => {
     try {
-      const { assetId, category, manufacturer, model, status, currentEmployee, currentLocation, purchaseDate, warrantyExpiryDate, notes } = req.body;
+      const { assetId, category, manufacturer, model, serialNumber, status, currentEmployee, currentLocation, purchaseDate, warrantyExpiryDate, notes } = req.body;
 
       // Validate required fields
       if (!assetId) {
@@ -88,15 +99,19 @@ const assetController = {
       if (isConnected()) {
         // Use MongoDB
         const asset = await Asset.create({
+          orgId: req.user.orgId,
+          createdBy: req.user._id,
+          assetId,
           name: assetId || manufacturer || 'Unnamed Asset',
           assetTag: assetId,
-          description: notes,
+          notes,
           category,
           manufacturer,
           model,
+          serialNumber: serialNumber || `SN-${assetId}`,
           status: status || 'Available',
-          location: currentLocation,
-          assignedTo: currentEmployee,
+          currentLocation,
+          currentEmployee,
           purchaseDate,
           warrantyExpiryDate,
           createdAt: new Date()

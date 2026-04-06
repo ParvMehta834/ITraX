@@ -1,18 +1,39 @@
 const express = require('express');
 const { authMiddleware } = require('../middleware/auth');
-const Notification = require('../models/Notification');
+const {
+  listNotificationsForUser,
+  markNotificationRead,
+  markAllNotificationsRead,
+} = require('../services/notificationService');
 
 const router = express.Router();
 
 router.get('/', authMiddleware, async (req, res) => {
-  const list = await Notification.find({ userId: req.user._id }).sort({ createdAt: -1 }).limit(50);
-  res.json({ data: list });
+  try {
+    const list = await listNotificationsForUser(req.user);
+    res.json({ data: list });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch notifications', error: error.message });
+  }
 });
 
 router.patch('/:id/read', authMiddleware, async (req, res) => {
-  const id = req.params.id;
-  await Notification.findByIdAndUpdate(id, { read: true });
-  res.json({ ok: true });
+  try {
+    const id = req.params.id;
+    await markNotificationRead(id, req.user);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to mark notification as read', error: error.message });
+  }
+});
+
+router.patch('/read-all', authMiddleware, async (req, res) => {
+  try {
+    await markAllNotificationsRead(req.user);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to mark all notifications as read', error: error.message });
+  }
 });
 
 module.exports = router;

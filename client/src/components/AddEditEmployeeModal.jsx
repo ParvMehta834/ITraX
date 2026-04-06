@@ -7,6 +7,7 @@ export default function AddEditEmployeeModal({ isOpen, onClose, onSuccess, emplo
     firstName: '',
     lastName: '',
     email: '',
+    password: '',
     phone: '',
     department: '',
     locationId: '',
@@ -21,6 +22,7 @@ export default function AddEditEmployeeModal({ isOpen, onClose, onSuccess, emplo
         firstName: employee.firstName || '',
         lastName: employee.lastName || '',
         email: employee.email || '',
+        password: '',
         phone: employee.phone || '',
         department: employee.department || '',
         locationId: employee.locationId?._id || '',
@@ -31,6 +33,7 @@ export default function AddEditEmployeeModal({ isOpen, onClose, onSuccess, emplo
         firstName: '',
         lastName: '',
         email: '',
+        password: '',
         phone: '',
         department: '',
         locationId: '',
@@ -54,6 +57,8 @@ export default function AddEditEmployeeModal({ isOpen, onClose, onSuccess, emplo
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     if (formData.email && !formData.email.includes('@')) newErrors.email = 'Valid email is required';
+    if (!employee && !formData.password.trim()) newErrors.password = 'Password is required for new employee';
+    if (!employee && formData.password.trim().length < 6) newErrors.password = 'Password must be at least 6 characters';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -68,19 +73,21 @@ export default function AddEditEmployeeModal({ isOpen, onClose, onSuccess, emplo
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim(),
+        password: formData.password,
         phone: formData.phone || '',
         department: formData.department || '',
         locationId: formData.locationId || null,
         status: formData.status
       };
 
+      let result;
       if (employee) {
-        await employeesService.updateEmployee(employee._id, data);
+        result = await employeesService.updateEmployee(employee._id, data);
       } else {
-        await employeesService.createEmployee(data);
+        result = await employeesService.createEmployee(data);
       }
 
-      onSuccess();
+      onSuccess(result);
       onClose();
     } catch (error) {
       const status = error.response?.status;
@@ -157,7 +164,36 @@ export default function AddEditEmployeeModal({ isOpen, onClose, onSuccess, emplo
               {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
             </div>
 
+            {!employee && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Login Password *
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="Minimum 6 characters"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Employee ID
+                </label>
+                <input
+                  type="text"
+                  value={employee?.employeeCode || 'Auto generated (6 digits)'}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700"
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Phone

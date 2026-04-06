@@ -13,6 +13,21 @@ const CategorySchema = new mongoose.Schema(
       trim: true,
     },
     description: String,
+    totalAssets: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    availableAssets: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    assignedAssets: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     iconKey: {
       type: String,
       default: 'Package',

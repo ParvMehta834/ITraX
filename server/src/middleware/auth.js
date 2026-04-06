@@ -12,6 +12,7 @@ const authMiddleware = async (req, res, next) => {
     const userObj = user.toObject ? user.toObject() : { ...user };
     if (userObj.passwordHash) delete userObj.passwordHash;
     req.user = userObj;
+    req.userId = String(userObj._id);
     next();
   } catch (err) {
     return res.status(401).json({ message: 'Invalid token' });

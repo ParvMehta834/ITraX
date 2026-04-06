@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Bell, Menu, X, LogOut, User } from 'lucide-react'
+import { Menu, X, LogOut, User } from 'lucide-react'
 import Avatar from './Avatar'
+import Notifications from './Notifications'
 
 const MENU_ITEMS = [
   { label: 'Assets', path: '/admin/assets' },
@@ -83,23 +84,7 @@ export default function GlassNavbar() {
 
             {/* Right Side - Icons & Avatar */}
             <div className="flex items-center gap-4">
-              {/* Notification Bell */}
-              <button
-                className="
-                  relative p-2
-                  text-gray-300 hover:text-white
-                  transition-colors duration-300
-                  hover:bg-white/10 rounded-full
-                "
-              >
-                <Bell size={20} />
-                <span
-                  className="
-                    absolute top-1 right-1
-                    w-2 h-2 bg-red-500 rounded-full
-                  "
-                />
-              </button>
+              <Notifications />
 
               {/* Profile Dropdown */}
               <div className="relative">

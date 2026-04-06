@@ -117,8 +117,15 @@ export default function AdminEmployees() {
     setSelectedEmployee(null);
   };
 
-  const handleModalSuccess = () => {
+  const handleModalSuccess = (payload) => {
+    const wasEditing = Boolean(selectedEmployee);
     handleModalClose();
+    const generatedPassword = payload?.tempPassword;
+    if (generatedPassword) {
+      showToast(`Employee created. Temporary password: ${generatedPassword}`, 'success');
+    } else {
+      showToast(wasEditing ? 'Employee updated successfully' : 'Employee created successfully', 'success');
+    }
     fetchEmployees(1);
   };
 
@@ -176,7 +183,7 @@ export default function AdminEmployees() {
         </button>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <div className="text-gray-500">Loading...</div>
@@ -187,9 +194,10 @@ export default function AdminEmployees() {
             <p className="text-gray-400 text-sm">Add your first employee to get started</p>
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[1080px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Employee ID</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Email</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Phone</th>
@@ -202,6 +210,9 @@ export default function AdminEmployees() {
             <tbody>
               {employees.map((employee) => (
                 <tr key={employee._id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 text-sm font-mono text-gray-700">
+                    {employee.employeeCode || '------'}
+                  </td>
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">
                     {employee.firstName} {employee.lastName}
                   </td>

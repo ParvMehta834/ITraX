@@ -2,6 +2,12 @@ const MockDB = require('../config/mockDb');
 const { isConnected } = require('../config/db');
 const License = require('../models/License');
 
+const normalizeStatus = (status) => {
+  if (status === 'Expiring Soon') return 'ExpiringSoon';
+  if (status === 'ExpiringSoon' || status === 'Expired' || status === 'Active') return status;
+  return 'Active';
+};
+
 const licenseController = {
   getLicenses: async (req, res) => {
     try {
@@ -43,7 +49,10 @@ const licenseController = {
             l.licenseKey?.toLowerCase().includes(searchLower)
           );
         }
-        if (status) filtered = filtered.filter(l => l.status === status);
+        if (status) {
+          const normalizedStatus = normalizeStatus(status);
+          filtered = filtered.filter(l => normalizeStatus(l.status) === normalizedStatus);
+        }
 
         const total = filtered.length;
         const pageNum = parseInt(page);
@@ -68,7 +77,7 @@ const licenseController = {
 
   createLicense: async (req, res) => {
     try {
-      const { name, licenseKey, vendor, expirationDate, seats, assignedTo, status } = req.body;
+      const { name, licenseKey, vendor, expirationDate, renewalDate, seats, assignedTo, status, cost } = req.body;
 
       if (!name || !licenseKey) {
         return res.status(400).json({ message: 'License name and key are required' });
@@ -76,13 +85,17 @@ const licenseController = {
 
       if (isConnected()) {
         const license = await License.create({
+          orgId: req.user.orgId,
           name,
           licenseKey,
           vendor,
-          expirationDate,
+          renewalDate: renewalDate || expirationDate,
+          seatsTotal: Number(seats) || 1,
           seats,
           assignedTo,
-          status: status || 'Active',
+          cost: Number(cost) || 0,
+          status: normalizeStatus(status),
+          createdBy: req.user._id,
           createdAt: new Date()
         });
         res.status(201).json(license);
@@ -91,10 +104,13 @@ const licenseController = {
           name,
           licenseKey,
           vendor,
-          expirationDate,
-          seats,
+          renewalDate: renewalDate || expirationDate,
+          expirationDate: renewalDate || expirationDate,
+          seatsTotal: Number(seats) || 1,
+          seats: Number(seats) || 1,
           assignedTo,
-          status: status || 'Active'
+          cost: Number(cost) || 0,
+          status: normalizeStatus(status)
         });
         res.status(201).json(license);
       }
@@ -126,7 +142,13 @@ const licenseController = {
   updateLicense: async (req, res) => {
     try {
       const { id } = req.params;
-      const updates = req.body;
+      const updates = {
+        ...req.body,
+        ...(req.body.seats !== undefined ? { seats: Number(req.body.seats) || 1, seatsTotal: Number(req.body.seats) || 1 } : {}),
+        ...(req.body.cost !== undefined ? { cost: Number(req.body.cost) || 0 } : {}),
+        ...(req.body.status !== undefined ? { status: normalizeStatus(req.body.status) } : {}),
+        ...(req.body.expirationDate && !req.body.renewalDate ? { renewalDate: req.body.expirationDate } : {}),
+      };
 
       if (isConnected()) {
         const license = await License.findByIdAndUpdate(id, { ...updates, updatedAt: new Date() }, { new: true }).lean();

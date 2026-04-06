@@ -7,6 +7,13 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import AdminAssets from './pages/AdminAssets'
 import EmployeeAssets from './pages/EmployeeAssets'
+import EmployeeLayout from './components/employee/EmployeeLayout'
+import EmployeeAssetsPage from './pages/employee/Assets'
+import EmployeeOrdersPage from './pages/employee/Orders'
+import EmployeeLicensesPage from './pages/employee/Licenses'
+import EmployeeCategoriesPage from './pages/employee/Categories'
+import EmployeeReportsPage from './pages/employee/Reports'
+import EmployeeProfilePage from './pages/employee/Profile'
 import AdminLayout from './components/AdminLayout'
 import AdminEmployees from './pages/AdminEmployees'
 import AdminAddAsset from './pages/AdminAddAsset'
@@ -22,16 +29,28 @@ import ToastProvider from './components/Toast'
 
 function useAuth() {
   const [user, setUser] = useState(null)
+  const [isReady, setIsReady] = useState(false)
   useEffect(() => {
     const raw = localStorage.getItem('itrax_user')
-    if (raw) setUser(JSON.parse(raw))
+    if (raw) {
+      try {
+        setUser(JSON.parse(raw))
+      } catch {
+        localStorage.removeItem('itrax_user')
+      }
+    }
+    setIsReady(true)
   }, [])
-  return { user, setUser }
+  return { user, setUser, isReady }
 }
 
 function App() {
   const auth = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const hideGlobalNavPaths = ['/login', '/signup']
+  const isEmployeeArea = location.pathname.startsWith('/employee')
+  const shouldShowGlobalNav = location.pathname !== '/' && !hideGlobalNavPaths.includes(location.pathname) && !isEmployeeArea
 
   const logout = () => {
     localStorage.removeItem('itrax_token')
@@ -44,7 +63,7 @@ function App() {
     <ToastProvider>
       <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-white">
       {/* show global nav on non-home pages only; home has its own floating menubar */}
-      {useLocation().pathname !== '/' && (
+      {shouldShowGlobalNav && (
         <nav className="p-4 flex justify-between items-center">
           <div className="text-2xl font-bold">ITraX</div>
           <div className="space-x-4">
@@ -52,7 +71,7 @@ function App() {
             {!auth.user && <Link to="/login">Login</Link>}
             {!auth.user && <Link to="/signup">Get Started</Link>}
             {auth.user && auth.user.role === 'ADMIN' && <Link to="/admin/assets">Admin</Link>}
-            {auth.user && auth.user.role === 'EMPLOYEE' && <Link to="/employee/my-assets">My Assets</Link>}
+            {auth.user && auth.user.role === 'EMPLOYEE' && <Link to="/employee/assets">Employee</Link>}
             {auth.user && <button onClick={logout} className="ml-2">Logout</button>}
           </div>
         </nav>
@@ -65,7 +84,16 @@ function App() {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/login" element={<Login onLogin={auth.setUser} />} />
           <Route path="/signup" element={<Signup onSignup={auth.setUser} />} />
-          <Route path="/admin" element={auth.user && auth.user.role === 'ADMIN' ? <AdminLayout /> : <Navigate to="/login" replace />}>
+          <Route
+            path="/admin"
+            element={
+              !auth.isReady
+                ? <div className="text-gray-700">Loading...</div>
+                : auth.user && auth.user.role === 'ADMIN'
+                  ? <AdminLayout />
+                  : <Navigate to="/login" />
+            }
+          >
             <Route path="assets" element={<AdminAssets />} />
             <Route path="assets/add" element={<AdminAddAsset />} />
             <Route path="assets/:id" element={<AssetDetail />} />
@@ -78,7 +106,25 @@ function App() {
             <Route path="tracking" element={<Tracking />} />
             <Route path="profile" element={<AdminProfile />} />
           </Route>
-          <Route path="/employee/my-assets" element={auth.user && auth.user.role === 'EMPLOYEE' ? <EmployeeAssets /> : <Navigate to="/login" replace />} />
+          <Route
+            path="/employee"
+            element={
+              !auth.isReady
+                ? <div className="text-gray-700">Loading...</div>
+                : auth.user && auth.user.role === 'EMPLOYEE'
+                  ? <EmployeeLayout />
+                  : <Navigate to="/login" />
+            }
+          >
+            <Route index element={<Navigate to="assets" replace />} />
+            <Route path="assets" element={<EmployeeAssetsPage />} />
+            <Route path="orders" element={<EmployeeOrdersPage />} />
+            <Route path="licenses" element={<EmployeeLicensesPage />} />
+            <Route path="categories" element={<EmployeeCategoriesPage />} />
+            <Route path="reports" element={<EmployeeReportsPage />} />
+            <Route path="profile" element={<EmployeeProfilePage />} />
+          </Route>
+          <Route path="/employee/my-assets" element={<Navigate to="/employee/assets" />} />
         </Routes>
       </main>
       </div>

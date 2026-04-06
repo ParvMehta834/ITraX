@@ -6,6 +6,8 @@ const bcrypt = require('bcrypt');
 const { authMiddleware, requireRole } = require('../middleware/auth');
 const User = require('../models/User');
 const Asset = require('../models/Asset');
+const MockDB = require('../config/mockDb');
+const { isConnected } = require('../config/db');
 const { Parser } = require('json2csv');
 
 const router = express.Router();
@@ -25,6 +27,54 @@ const validateEmployee = (data) => {
   return errors;
 };
 
+const normalizeOrgId = (orgId) => String(orgId || '');
+
+const isSameOrg = (user, orgId) => normalizeOrgId(user?.orgId) === normalizeOrgId(orgId);
+
+const matchesEmployeeSearch = (employee, search) => {
+  if (!search) return true;
+  const searchLower = String(search).toLowerCase();
+  return [employee.firstName, employee.lastName, employee.email, employee.department]
+    .some((value) => String(value || '').toLowerCase().includes(searchLower));
+};
+
+const sanitizeEmployee = (employee) => ({
+  _id: employee._id,
+  employeeCode: employee.employeeCode || '',
+  firstName: employee.firstName,
+  lastName: employee.lastName,
+  email: employee.email,
+  phone: employee.phone || '',
+  department: employee.department || '',
+  locationId: employee.locationId || null,
+  status: employee.status || 'ACTIVE'
+});
+
+const generateUniqueEmployeeCode = async (orgId) => {
+  const makeCode = () => String(Math.floor(100000 + Math.random() * 900000));
+
+  if (isConnected()) {
+    for (let i = 0; i < 20; i += 1) {
+      const code = makeCode();
+      const exists = await User.findOne({ orgId, employeeCode: code }).select('_id').lean();
+      if (!exists) return code;
+    }
+    return String(Date.now()).slice(-6);
+  }
+
+  const existingCodes = new Set(
+    MockDB.getUsers()
+      .filter((user) => isSameOrg(user, orgId))
+      .map((user) => String(user.employeeCode || ''))
+  );
+
+  let code = makeCode();
+  while (existingCodes.has(code)) {
+    code = makeCode();
+  }
+  return code;
+};
+
 // ====== EMPLOYEES ROUTES ======
 
 // GET /api/admin/employees - Get all employees with assigned asset counts
@@ -36,46 +86,67 @@ router.get('/employees', authMiddleware, requireRole('ADMIN'), async (req, res) 
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
     const skip = (pageNum - 1) * limitNum;
 
-    const query = { role: 'EMPLOYEE', orgId };
-    if (search) {
-      query.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { department: { $regex: search, $options: 'i' } }
-      ];
-    }
+    let employees = [];
+    let total = 0;
 
-    // Get employees with pagination
-    const employees = await User.find(query)
-      .select('-passwordHash')
-      .populate('locationId', 'name')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum)
-      .lean();
+    if (isConnected()) {
+      const query = { role: 'EMPLOYEE', orgId };
+      if (search) {
+        query.$or = [
+          { firstName: { $regex: search, $options: 'i' } },
+          { lastName: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { department: { $regex: search, $options: 'i' } }
+        ];
+      }
 
-    const total = await User.countDocuments(query);
+      employees = await User.find(query)
+        .select('-passwordHash')
+        .populate('locationId', 'name')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean();
 
-    // Get assigned asset counts for each employee
-    const employeesWithCounts = await Promise.all(
-      employees.map(async (employee) => {
-        const assignedAssets = await Asset.countDocuments({
-          orgId,
-          currentEmployee: `${employee.firstName} ${employee.lastName}`,
-          status: 'Assigned'
-        });
+      total = await User.countDocuments(query);
+
+      employees = await Promise.all(
+        employees.map(async (employee) => {
+          const assignedAssets = await Asset.countDocuments({
+            orgId,
+            currentEmployee: `${employee.firstName} ${employee.lastName}`,
+            status: 'Assigned'
+          });
+
+          return {
+            ...employee,
+            assignedAssets,
+            locationName: employee.locationId?.name || 'N/A'
+          };
+        })
+      );
+    } else {
+      const list = MockDB.getUsers()
+        .filter((user) => user.role === 'EMPLOYEE' && isSameOrg(user, orgId))
+        .filter((user) => matchesEmployeeSearch(user, search))
+        .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
+
+      total = list.length;
+      employees = list.slice(skip, skip + limitNum).map((employee) => {
+        const assignedAssets = MockDB.getAssets().filter((asset) => {
+          return isSameOrg(asset, orgId) && asset.currentEmployee === `${employee.firstName} ${employee.lastName}` && asset.status === 'Assigned';
+        }).length;
 
         return {
-          ...employee,
+          ...sanitizeEmployee(employee),
           assignedAssets,
-          locationName: employee.locationId?.name || 'N/A'
+          locationName: 'N/A'
         };
-      })
-    );
+      });
+    }
 
     res.json({
-      data: employeesWithCounts,
+      data: employees,
       total,
       page: pageNum,
       limit: limitNum,
@@ -90,7 +161,7 @@ router.get('/employees', authMiddleware, requireRole('ADMIN'), async (req, res) 
 // POST /api/admin/employees - Create employee (Admin only)
 router.post('/employees', authMiddleware, requireRole('ADMIN'), async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, department, locationId, status } = req.body;
+    const { firstName, lastName, email, password, phone, department, locationId, status } = req.body;
     const orgId = req.user.orgId;
 
     const errors = validateEmployee({ firstName, lastName, email });
@@ -98,32 +169,64 @@ router.post('/employees', authMiddleware, requireRole('ADMIN'), async (req, res)
       return res.status(400).json({ message: 'Validation error', errors });
     }
 
-    // Check if email exists
-    const existing = await User.findOne({ orgId, email: email.trim().toLowerCase() });
-    if (existing) {
-      return res.status(400).json({ message: 'Email already exists' });
+    const providedPassword = typeof password === 'string' ? password.trim() : '';
+    if (providedPassword && providedPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
+    const tempPassword = providedPassword || Math.random().toString(36).slice(-8);
+    const employeeCode = await generateUniqueEmployeeCode(orgId);
 
-    // Generate random password
-    const tempPassword = Math.random().toString(36).slice(-8);
-    const passwordHash = await bcrypt.hash(tempPassword, 10);
+    let employee;
 
-    const employee = await User.create({
-      orgId,
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: email.trim().toLowerCase(),
-      phone: phone || '',
-      department: department || '',
-      locationId: locationId || null,
-      status: status || 'ACTIVE',
-      passwordHash,
-      role: 'EMPLOYEE'
-    });
+    if (isConnected()) {
+      // Check if email exists
+      const existing = await User.findOne({ orgId, email: email.trim().toLowerCase() });
+      if (existing) {
+        return res.status(400).json({ message: 'Email already exists' });
+      }
+
+      const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+      employee = await User.create({
+        orgId,
+        employeeCode,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone || '',
+        department: department || '',
+        locationId: locationId || null,
+        status: status || 'ACTIVE',
+        passwordHash,
+        role: 'EMPLOYEE'
+      });
+    } else {
+      const normalizedEmail = email.trim().toLowerCase();
+      const existing = MockDB.getUsers().find((user) => user.role === 'EMPLOYEE' && isSameOrg(user, orgId) && user.email === normalizedEmail);
+      if (existing) {
+        return res.status(400).json({ message: 'Email already exists' });
+      }
+
+      const passwordHash = await bcrypt.hash(tempPassword, 10);
+      employee = MockDB.createUser({
+        orgId,
+        employeeCode,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: normalizedEmail,
+        phone: phone || '',
+        department: department || '',
+        locationId: locationId || null,
+        status: status || 'ACTIVE',
+        passwordHash,
+        role: 'EMPLOYEE'
+      });
+    }
 
     res.status(201).json({
       data: {
         _id: employee._id,
+        employeeCode: employee.employeeCode,
         firstName: employee.firstName,
         lastName: employee.lastName,
         email: employee.email,
@@ -144,9 +247,15 @@ router.post('/employees', authMiddleware, requireRole('ADMIN'), async (req, res)
 router.get('/employees/:id', authMiddleware, requireRole('ADMIN'), async (req, res) => {
   try {
     const orgId = req.user.orgId;
-    const employee = await User.findOne({ _id: req.params.id, orgId })
-      .select('-passwordHash')
-      .populate('locationId');
+    let employee;
+
+    if (isConnected()) {
+      employee = await User.findOne({ _id: req.params.id, orgId })
+        .select('-passwordHash')
+        .populate('locationId');
+    } else {
+      employee = MockDB.getUsers().find((user) => user._id === req.params.id && user.role === 'EMPLOYEE' && isSameOrg(user, orgId));
+    }
 
     if (!employee) {
       return res.status(404).json({ message: 'Employee not found' });
@@ -158,8 +267,9 @@ router.get('/employees/:id', authMiddleware, requireRole('ADMIN'), async (req, r
       status: 'Assigned'
     });
 
+    const employeeData = employee.toObject ? employee.toObject() : employee;
     res.json({
-      data: { ...employee.toObject(), assignedAssets }
+      data: { ...employeeData, assignedAssets }
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -177,35 +287,55 @@ router.put('/employees/:id', authMiddleware, requireRole('ADMIN'), async (req, r
       return res.status(400).json({ message: 'Validation error', errors });
     }
 
-    // Check if new email is taken by another user
-    const existing = await User.findOne({
-      orgId,
-      email: email.trim().toLowerCase(),
-      _id: { $ne: req.params.id }
-    });
-    if (existing) {
-      return res.status(400).json({ message: 'Email already exists' });
-    }
+    let employee;
 
-    const employee = await User.findOneAndUpdate(
-      { _id: req.params.id, orgId },
-      {
+    if (isConnected()) {
+      // Check if new email is taken by another user
+      const existing = await User.findOne({
+        orgId,
+        email: email.trim().toLowerCase(),
+        _id: { $ne: req.params.id }
+      });
+      if (existing) {
+        return res.status(400).json({ message: 'Email already exists' });
+      }
+
+      employee = await User.findOneAndUpdate(
+        { _id: req.params.id, orgId },
+        {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone || '',
+          department: department || '',
+          locationId: locationId || null,
+          status: status || 'ACTIVE'
+        },
+        { new: true, runValidators: true }
+      ).select('-passwordHash');
+    } else {
+      const normalizedEmail = email.trim().toLowerCase();
+      const existing = MockDB.getUsers().find((user) => user.role === 'EMPLOYEE' && isSameOrg(user, orgId) && user.email === normalizedEmail && user._id !== req.params.id);
+      if (existing) {
+        return res.status(400).json({ message: 'Email already exists' });
+      }
+
+      employee = MockDB.updateUser(req.params.id, {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         phone: phone || '',
         department: department || '',
         locationId: locationId || null,
         status: status || 'ACTIVE'
-      },
-      { new: true, runValidators: true }
-    ).select('-passwordHash');
+      });
+    }
 
     if (!employee) {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    res.json({ data: employee });
+    res.json({ data: employee.toObject ? employee.toObject() : employee });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -216,7 +346,9 @@ router.put('/employees/:id', authMiddleware, requireRole('ADMIN'), async (req, r
 router.delete('/employees/:id', authMiddleware, requireRole('ADMIN'), async (req, res) => {
   try {
     const orgId = req.user.orgId;
-    const employee = await User.findOneAndDelete({ _id: req.params.id, orgId });
+    const employee = isConnected()
+      ? await User.findOneAndDelete({ _id: req.params.id, orgId })
+      : MockDB.deleteUser(req.params.id);
     if (!employee) {
       return res.status(404).json({ message: 'Employee not found' });
     }
@@ -233,21 +365,29 @@ router.get('/employees/export/download', authMiddleware, requireRole('ADMIN'), a
     const { search } = req.query;
     const orgId = req.user.orgId;
 
-    const query = { role: 'EMPLOYEE', orgId };
-    if (search) {
-      query.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { department: { $regex: search, $options: 'i' } }
-      ];
-    }
+    let employees;
+    if (isConnected()) {
+      const query = { role: 'EMPLOYEE', orgId };
+      if (search) {
+        query.$or = [
+          { firstName: { $regex: search, $options: 'i' } },
+          { lastName: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { department: { $regex: search, $options: 'i' } }
+        ];
+      }
 
-    const employees = await User.find(query)
-      .select('-passwordHash')
-      .populate('locationId', 'name')
-      .sort({ createdAt: -1 })
-      .lean();
+      employees = await User.find(query)
+        .select('-passwordHash')
+        .populate('locationId', 'name')
+        .sort({ createdAt: -1 })
+        .lean();
+    } else {
+      employees = MockDB.getUsers()
+        .filter((user) => user.role === 'EMPLOYEE' && isSameOrg(user, orgId))
+        .filter((user) => matchesEmployeeSearch(user, search))
+        .map((employee) => ({ ...sanitizeEmployee(employee), locationId: { name: '' } }));
+    }
 
     if (employees.length === 0) {
       return res.status(400).json({ message: 'No employees to export' });
@@ -263,6 +403,7 @@ router.get('/employees/export/download', authMiddleware, requireRole('ADMIN'), a
         });
 
         return {
+          employeeCode: employee.employeeCode || '',
           firstName: employee.firstName,
           lastName: employee.lastName,
           email: employee.email,
@@ -275,7 +416,7 @@ router.get('/employees/export/download', authMiddleware, requireRole('ADMIN'), a
       })
     );
 
-    const fields = ['firstName', 'lastName', 'email', 'phone', 'department', 'location', 'assignedAssets', 'status'];
+    const fields = ['employeeCode', 'firstName', 'lastName', 'email', 'phone', 'department', 'location', 'assignedAssets', 'status'];
     const parser = new Parser({ fields });
     const csv = parser.parse(employeesWithCounts);
 

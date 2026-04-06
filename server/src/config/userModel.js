@@ -10,6 +10,7 @@ const UserSchema = new mongoose.Schema({
   firstName: String,
   lastName: String,
   email: { type: String, required: true },
+  employeeCode: String,
   phone: String,
   passwordHash: { type: String, required: true },
   timezone: String,
@@ -20,6 +21,7 @@ const UserSchema = new mongoose.Schema({
 });
 
 UserSchema.index({ orgId: 1, email: 1 }, { unique: true });
+UserSchema.index({ orgId: 1, employeeCode: 1 }, { unique: true, sparse: true });
 
 UserSchema.methods.comparePassword = function (candidate) {
   return bcrypt.compare(candidate, this.passwordHash);
