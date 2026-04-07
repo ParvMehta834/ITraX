@@ -27,18 +27,22 @@ import Tracking from './pages/Tracking'
 import AdminProfile from './pages/AdminProfile'
 import ToastProvider from './components/Toast'
 
+const readStoredUser = () => {
+  const raw = localStorage.getItem('itrax_user')
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    localStorage.removeItem('itrax_user')
+    return null
+  }
+}
+
 function useAuth() {
   const [user, setUser] = useState(null)
   const [isReady, setIsReady] = useState(false)
   useEffect(() => {
-    const raw = localStorage.getItem('itrax_user')
-    if (raw) {
-      try {
-        setUser(JSON.parse(raw))
-      } catch {
-        localStorage.removeItem('itrax_user')
-      }
-    }
+    setUser(readStoredUser())
     setIsReady(true)
   }, [])
   return { user, setUser, isReady }
@@ -48,6 +52,8 @@ function App() {
   const auth = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const storedUser = readStoredUser()
+  const currentUser = auth.user || storedUser
   const hideGlobalNavPaths = ['/login', '/signup']
   const isEmployeeArea = location.pathname.startsWith('/employee')
   const shouldShowGlobalNav = location.pathname !== '/' && !hideGlobalNavPaths.includes(location.pathname) && !isEmployeeArea
@@ -68,11 +74,11 @@ function App() {
           <div className="text-2xl font-bold">ITraX</div>
           <div className="space-x-4">
             <Link to="/">Home</Link>
-            {!auth.user && <Link to="/login">Login</Link>}
-            {!auth.user && <Link to="/signup">Get Started</Link>}
-            {auth.user && auth.user.role === 'ADMIN' && <Link to="/admin/assets">Admin</Link>}
-            {auth.user && auth.user.role === 'EMPLOYEE' && <Link to="/employee/assets">Employee</Link>}
-            {auth.user && <button onClick={logout} className="ml-2">Logout</button>}
+            {!currentUser && <Link to="/login">Login</Link>}
+            {!currentUser && <Link to="/signup">Get Started</Link>}
+            {currentUser && currentUser.role === 'ADMIN' && <Link to="/admin/assets">Admin</Link>}
+            {currentUser && currentUser.role === 'EMPLOYEE' && <Link to="/employee/assets">Employee</Link>}
+            {currentUser && <button onClick={logout} className="ml-2">Logout</button>}
           </div>
         </nav>
       )}
@@ -89,7 +95,7 @@ function App() {
             element={
               !auth.isReady
                 ? <div className="text-gray-700">Loading...</div>
-                : auth.user && auth.user.role === 'ADMIN'
+                : currentUser && currentUser.role === 'ADMIN'
                   ? <AdminLayout />
                   : <Navigate to="/login" />
             }
@@ -111,7 +117,7 @@ function App() {
             element={
               !auth.isReady
                 ? <div className="text-gray-700">Loading...</div>
-                : auth.user && auth.user.role === 'EMPLOYEE'
+                : currentUser && currentUser.role === 'EMPLOYEE'
                   ? <EmployeeLayout />
                   : <Navigate to="/login" />
             }

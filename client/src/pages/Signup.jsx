@@ -9,6 +9,7 @@ export default function Signup({ onSignup }) {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [err, setErr] = useState(null)
+  const [loading, setLoading] = useState(false)
   const nav = useNavigate()
 
   const submit = async (e) => {
@@ -34,6 +35,7 @@ export default function Signup({ onSignup }) {
     }
     
     try {
+      setLoading(true)
       const res = await fetch(buildApiUrl('/auth/signup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -62,6 +64,8 @@ export default function Signup({ onSignup }) {
       } else {
         setErr(err.message || 'Network error - please try again')
       }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -126,7 +130,7 @@ export default function Signup({ onSignup }) {
             />
           </div>
           {err && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">{err}</div>}
-          <button className="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-200 mt-6">Sign Up</button>
+          <button disabled={loading} className="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-200 mt-6 disabled:opacity-60 disabled:cursor-not-allowed">{loading ? 'Creating account...' : 'Sign Up'}</button>
         </form>
         <div className="text-center mt-6">
           <p className="text-gray-600 text-sm">Already have an account? <button type="button" onClick={()=>nav('/login')} className="text-blue-600 font-semibold hover:underline">Login</button></p>

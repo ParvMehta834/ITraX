@@ -7,6 +7,7 @@ export default function Login({ onLogin }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [err, setErr] = useState(null)
+  const [loading, setLoading] = useState(false)
   const nav = useNavigate()
 
   const submit = async (e) => {
@@ -24,6 +25,7 @@ export default function Login({ onLogin }) {
     }
     
     try {
+      setLoading(true)
       const res = await fetch(buildApiUrl('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -52,6 +54,8 @@ export default function Login({ onLogin }) {
       } else {
         setErr(err.message || 'Network error - please try again')
       }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -89,7 +93,7 @@ export default function Login({ onLogin }) {
             />
           </div>
           {err && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">{err}</div>}
-          <button className="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-200 mt-6">Login</button>
+          <button disabled={loading} className="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-200 mt-6 disabled:opacity-60 disabled:cursor-not-allowed">{loading ? 'Logging in...' : 'Login'}</button>
         </form>
         <div className="text-center mt-6">
           <p className="text-gray-600 text-sm">Don't have an account? <button type="button" onClick={()=>nav('/signup')} className="text-blue-600 font-semibold hover:underline">Sign up</button></p>
