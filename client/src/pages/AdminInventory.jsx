@@ -163,7 +163,18 @@ export default function AdminInventory() {
 
   // Check if item is low stock
   const isLowStock = (item) => {
-    return item.quantityOnHand < item.quantityMinimum;
+    return Number(item?.quantityOnHand || 0) < Number(item?.quantityMinimum || 0);
+  };
+
+  const formatCurrency = (value) => {
+    const amount = Number(value);
+    return Number.isFinite(amount) ? amount.toFixed(2) : '0.00';
+  };
+
+  const getItemTotal = (item) => {
+    const total = Number(item?.total);
+    if (Number.isFinite(total)) return total;
+    return Number(item?.quantityOnHand || 0) * Number(item?.costPerItem || 0);
   };
 
   return (
@@ -305,10 +316,10 @@ export default function AdminInventory() {
                         {item.quantityMinimum}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                        ${item.costPerItem.toFixed(2)}
+                        ${formatCurrency(item.costPerItem)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right font-semibold">
-                        ${item.total.toFixed(2)}
+                        ${formatCurrency(getItemTotal(item))}
                       </td>
                       <td className="px-4 py-3 text-center relative">
                         <button

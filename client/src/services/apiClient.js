@@ -43,8 +43,11 @@ apiClient.interceptors.response.use(
       config.headers.Authorization = `Bearer ${newToken}`;
       return apiClient(config);
     } catch (refreshError) {
-      localStorage.removeItem('itrax_token');
-      localStorage.removeItem('itrax_user');
+      const refreshStatus = refreshError?.response?.status;
+      if (refreshStatus === 401 || refreshStatus === 403) {
+        localStorage.removeItem('itrax_token');
+        localStorage.removeItem('itrax_user');
+      }
       return Promise.reject(refreshError);
     }
   }
