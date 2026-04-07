@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 require('dotenv').config();
-const cors = require('cors');
 
 console.log('[1/4] Dotenv configured');
 
@@ -10,9 +9,6 @@ console.log('[2/4] DB module loaded');
 
 const app = require('./src/app');
 console.log('[3/4] App loaded');
-
-// ✅ Apply CORS AFTER app is loaded
-app.use(cors());
 
 const PORT = process.env.PORT || 10000;
 console.log('[4/4] Connecting MongoDB and starting server on port', PORT);

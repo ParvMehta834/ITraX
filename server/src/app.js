@@ -22,10 +22,20 @@ const allowedOrigins = [
 	...(process.env.CLIENT_URLS || '').split(',')
 ].map((origin) => origin && origin.trim()).filter(Boolean);
 
+const isAllowedOrigin = (origin) => {
+	if (!origin) return true;
+	if (allowedOrigins.includes(origin)) return true;
+	try {
+		const hostname = new URL(origin).hostname;
+		return hostname.endsWith('.vercel.app') || hostname === 'localhost' || hostname === '127.0.0.1';
+	} catch {
+		return false;
+	}
+};
+
 app.use(cors({
 	origin(origin, callback) {
-		if (!origin) return callback(null, true);
-		if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+		if (isAllowedOrigin(origin)) {
 			return callback(null, true);
 		}
 		return callback(new Error('Not allowed by CORS'));
