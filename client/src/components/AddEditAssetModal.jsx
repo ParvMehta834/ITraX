@@ -9,6 +9,7 @@ export default function AddEditAssetModal({ isOpen, onClose, onSuccess, asset = 
     model: '',
     status: 'Available',
     currentEmployee: '',
+    assignedToEmployeeId: '',
     currentLocation: '',
     purchaseDate: '',
     warrantyExpiryDate: '',
@@ -27,6 +28,7 @@ export default function AddEditAssetModal({ isOpen, onClose, onSuccess, asset = 
         model: asset.model || '',
         status: asset.status || 'Available',
         currentEmployee: asset.currentEmployee || '',
+        assignedToEmployeeId: asset.assignedToEmployeeId?._id || asset.assignedToEmployeeId || '',
         currentLocation: asset.currentLocation || '',
         purchaseDate: asset.purchaseDate ? asset.purchaseDate.split('T')[0] : '',
         warrantyExpiryDate: asset.warrantyExpiryDate ? asset.warrantyExpiryDate.split('T')[0] : '',
@@ -40,6 +42,7 @@ export default function AddEditAssetModal({ isOpen, onClose, onSuccess, asset = 
         model: '',
         status: 'Available',
         currentEmployee: '',
+        assignedToEmployeeId: '',
         currentLocation: '',
         purchaseDate: '',
         warrantyExpiryDate: '',
@@ -51,7 +54,22 @@ export default function AddEditAssetModal({ isOpen, onClose, onSuccess, asset = 
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+
+    if (name === 'assignedToEmployeeId') {
+      const selectedEmployee = employees.find((emp) => String(emp._id) === String(value));
+      const resolvedName = selectedEmployee
+        ? `${selectedEmployee.firstName || ''} ${selectedEmployee.lastName || ''}`.trim()
+        : '';
+
+      setFormData(prev => ({
+        ...prev,
+        assignedToEmployeeId: value,
+        currentEmployee: resolvedName
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
+
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -205,14 +223,17 @@ export default function AddEditAssetModal({ isOpen, onClose, onSuccess, asset = 
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Current Location *
               </label>
-              <input
-                type="text"
+              <select
                 name="currentLocation"
                 value={formData.currentLocation}
                 onChange={handleChange}
-                placeholder="e.g., Office A"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+              >
+                <option value="">Select location</option>
+                {locations.map((loc) => (
+                  <option key={loc._id} value={loc.name}>{loc.name}</option>
+                ))}
+              </select>
               {errors.currentLocation && <p className="text-red-500 text-xs mt-1">{errors.currentLocation}</p>}
             </div>
 
@@ -221,14 +242,19 @@ export default function AddEditAssetModal({ isOpen, onClose, onSuccess, asset = 
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Current Employee
               </label>
-              <input
-                type="text"
-                name="currentEmployee"
-                value={formData.currentEmployee}
+              <select
+                name="assignedToEmployeeId"
+                value={formData.assignedToEmployeeId}
                 onChange={handleChange}
-                placeholder="Employee name or ID"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+              >
+                <option value="">Unassigned</option>
+                {employees.map((emp) => (
+                  <option key={emp._id} value={emp._id}>
+                    {(emp.employeeCode || '------')} - {emp.firstName} {emp.lastName}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Purchase Date */}

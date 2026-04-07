@@ -1,9 +1,10 @@
 import apiClient from './apiClient';
+import { getAuthToken } from '../utils/authStorage';
 
 const API_URL = '/api/locations';
 
 const getAuthHeader = () => {
-  const token = localStorage.getItem('itrax_token');
+  const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
@@ -18,19 +19,19 @@ const locationsService = {
   getLocationById: (id) => {
     return apiClient.get(`${API_URL}/${id}`, {
       headers: getAuthHeader()
-    }).then(res => res.data.data);
+    }).then(res => res.data?.data ?? res.data);
   },
 
   createLocation: (locationData) => {
     return apiClient.post(API_URL, locationData, {
       headers: getAuthHeader()
-    }).then(res => res.data.data);
+    }).then(res => res.data?.data ?? res.data);
   },
 
   updateLocation: (id, locationData) => {
     return apiClient.put(`${API_URL}/${id}`, locationData, {
       headers: getAuthHeader()
-    }).then(res => res.data.data);
+    }).then(res => res.data?.data ?? res.data);
   },
 
   deleteLocation: (id) => {

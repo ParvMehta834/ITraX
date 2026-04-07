@@ -1,10 +1,11 @@
 import apiClient from './apiClient';
+import { getAuthToken } from '../utils/authStorage';
 
 const API_URL = '/api/assets';
 
 // Helper to get auth token
 const getAuthHeader = () => {
-  const token = localStorage.getItem('itrax_token');
+  const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
@@ -21,21 +22,21 @@ const assetService = {
   getAssetById: (id) => {
     return apiClient.get(`${API_URL}/${id}`, {
       headers: getAuthHeader()
-    }).then(res => res.data.data);
+    }).then(res => res.data?.data ?? res.data);
   },
 
   // Create new asset
   createAsset: (assetData) => {
     return apiClient.post(API_URL, assetData, {
       headers: getAuthHeader()
-    }).then(res => res.data.data);
+    }).then(res => res.data?.data ?? res.data);
   },
 
   // Update asset
   updateAsset: (id, assetData) => {
     return apiClient.put(`${API_URL}/${id}`, assetData, {
       headers: getAuthHeader()
-    }).then(res => res.data.data);
+    }).then(res => res.data?.data ?? res.data);
   },
 
   // Delete asset

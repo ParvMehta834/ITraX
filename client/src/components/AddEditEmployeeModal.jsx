@@ -25,7 +25,7 @@ export default function AddEditEmployeeModal({ isOpen, onClose, onSuccess, emplo
         password: '',
         phone: employee.phone || '',
         department: employee.department || '',
-        locationId: employee.locationId?._id || '',
+        locationId: employee.locationId?._id || employee.locationId || '',
         status: employee.status || 'ACTIVE'
       });
     } else {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import employeeService from '../../services/employeeService'
 import reportsService from '../../services/reportsService'
+import { getAuthUser } from '../../utils/authStorage'
 
 export default function EmployeeReportsPage() {
   const [summary, setSummary] = useState({ assets: 0, orders: 0, licenses: 0, categories: 0 })
@@ -28,12 +29,7 @@ export default function EmployeeReportsPage() {
     const fetchReports = async () => {
       setLoading(true)
       try {
-        let currentUser = null
-        try {
-          currentUser = JSON.parse(localStorage.getItem('itrax_user') || 'null')
-        } catch {
-          currentUser = null
-        }
+        const currentUser = getAuthUser()
 
         const [assetsBody, ordersBody, licensesBody, categoriesBody] = await Promise.all([
           employeeService.getAssets({ limit: 200 }),

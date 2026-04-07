@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { Menu, X, LogOut, User } from 'lucide-react'
 import Avatar from './Avatar'
 import Notifications from './Notifications'
+import { clearAuthSession, getAuthUser } from '../utils/authStorage'
 
 const MENU_ITEMS = [
   { label: 'Assets', path: '/admin/assets' },
@@ -21,12 +22,11 @@ export default function GlassNavbar() {
   const navigate = useNavigate()
 
   // Get user from localStorage
-  const user = JSON.parse(localStorage.getItem('itrax_user') || '{"name":"User"}')
+  const user = getAuthUser() || { name: 'User' }
   const userName = user?.name || 'User'
 
   const handleLogout = () => {
-    localStorage.removeItem('itrax_token')
-    localStorage.removeItem('itrax_user')
+    clearAuthSession()
     setDropdownOpen(false)
     navigate('/login')
   }

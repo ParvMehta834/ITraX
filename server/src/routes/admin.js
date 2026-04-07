@@ -445,9 +445,19 @@ const upload = multer({ storage });
 
 router.post('/assets', authMiddleware, requireRole('ADMIN'), upload.single('image'), async (req, res) => {
   try {
-    const data = req.body;
+    const data = { ...req.body };
     if (req.file) data.imageUrl = `/uploads/${req.file.filename}`;
-    const asset = await Asset.create(data);
+
+    const payload = {
+      ...data,
+      orgId: req.user.orgId,
+      createdBy: req.user._id,
+      assignedToEmployeeId: data.assignedToEmployeeId || null,
+      currentEmployee: String(data.currentEmployee || '').trim(),
+      status: data.assignedToEmployeeId ? 'Assigned' : (data.status || 'Available')
+    };
+
+    const asset = await Asset.create(payload);
     res.json({ asset });
   } catch (err) {
     console.error(err);
@@ -457,9 +467,9 @@ router.post('/assets', authMiddleware, requireRole('ADMIN'), upload.single('imag
 
 router.get('/assets', authMiddleware, requireRole('ADMIN'), async (req, res) => {
   const q = req.query.q || '';
-  const filter = {};
+  const filter = { orgId: req.user.orgId, isDeleted: { $ne: true } };
   if (q) filter.$or = [ { assetId: new RegExp(q, 'i') }, { manufacturer: new RegExp(q, 'i') }, { model: new RegExp(q, 'i') } ];
-  const list = await Asset.find(filter).limit(200).lean();
+  const list = await Asset.find(filter).sort({ createdAt: -1 }).limit(200).lean();
   res.json({ data: list });
 });
 
@@ -468,7 +478,24 @@ router.patch('/assets/:id', authMiddleware, requireRole('ADMIN'), upload.single(
     const id = req.params.id;
     const update = { ...req.body };
     if (req.file) update.imageUrl = `/uploads/${req.file.filename}`;
-    const asset = await Asset.findByIdAndUpdate(id, update, { new: true });
+
+    if (Object.prototype.hasOwnProperty.call(update, 'assignedToEmployeeId')) {
+      update.assignedToEmployeeId = update.assignedToEmployeeId || null;
+      if (update.assignedToEmployeeId) {
+        update.status = 'Assigned';
+      }
+    }
+
+    const asset = await Asset.findOneAndUpdate(
+      { _id: id, orgId: req.user.orgId },
+      { ...update, updatedBy: req.user._id, updatedAt: new Date() },
+      { new: true }
+    );
+
+    if (!asset) {
+      return res.status(404).json({ message: 'Asset not found' });
+    }
+
     res.json({ asset });
   } catch (err) {
     console.error(err);

@@ -1,10 +1,11 @@
 import apiClient from './apiClient';
+import { getAuthToken } from '../utils/authStorage';
 
 const API_URL = '/api/inventory';
 
 // Helper to get auth token
 const getAuthHeader = () => {
-  const token = localStorage.getItem('itrax_token');
+  const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
@@ -21,21 +22,21 @@ const inventoryService = {
   getItemById: (id) => {
     return apiClient.get(`${API_URL}/${id}`, {
       headers: getAuthHeader()
-    }).then(res => res.data.data);
+    }).then(res => res.data?.data ?? res.data);
   },
 
   // Create new inventory item
   createItem: (itemData) => {
     return apiClient.post(API_URL, itemData, {
       headers: getAuthHeader()
-    }).then(res => res.data.data);
+    }).then(res => res.data?.data ?? res.data);
   },
 
   // Update inventory item
   updateItem: (id, itemData) => {
     return apiClient.put(`${API_URL}/${id}`, itemData, {
       headers: getAuthHeader()
-    }).then(res => res.data.data);
+    }).then(res => res.data?.data ?? res.data);
   },
 
   // Delete inventory item

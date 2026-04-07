@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import orderService from '../services/orderService';
 import employeesService from '../services/employeesService';
 
-export default function AddEditOrderModal({ isOpen, onClose, onSuccess, order = null }) {
+export default function AddEditOrderModal({ isOpen, onClose, onSuccess, order = null, locations = [] }) {
   const [formData, setFormData] = useState({
     orderId: '',
     assetName: '',
@@ -292,14 +292,17 @@ export default function AddEditOrderModal({ isOpen, onClose, onSuccess, order = 
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Current Location *
               </label>
-              <input
-                type="text"
+              <select
                 name="currentLocation"
                 value={formData.currentLocation}
                 onChange={handleChange}
-                placeholder="e.g., Warehouse A"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="">Select location</option>
+                {locations.map((loc) => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
               {errors.currentLocation && <p className="text-red-500 text-xs mt-1">{errors.currentLocation}</p>}
             </div>
 

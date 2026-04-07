@@ -1,10 +1,11 @@
 import apiClient from './apiClient';
+import { getAuthToken } from '../utils/authStorage';
 
 const API_URL = '/api/employee';
 const ADMIN_API_URL = '/api/admin/employees';
 
 const getAuthHeader = () => {
-  const token = localStorage.getItem('itrax_token');
+  const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 

@@ -2,102 +2,168 @@ const MockDB = require('../config/mockDb');
 const { isConnected } = require('../config/db');
 const Asset = require('../models/Asset');
 
+const normalizeRole = (role) => String(role || '').trim().toUpperCase();
+
+const normalizeText = (value) => String(value || '').trim().toLowerCase();
+
+const normalizeOrgId = (value) => String(value || '');
+
+const buildEmployeeVisibilityQuery = (user) => {
+  const fullName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
+  const employeeCode = String(user?.employeeCode || '').trim();
+
+  const visibility = [{ assignedToEmployeeId: user?._id }];
+
+  if (fullName) {
+    visibility.push({
+      currentEmployee: { $regex: `^${fullName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+    });
+  }
+
+  if (employeeCode) {
+    visibility.push({
+      currentEmployee: { $regex: `(^|\\b)${employeeCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\b|$)`, $options: 'i' },
+    });
+  }
+
+  return { $or: visibility };
+};
+
+const isMockAssetVisibleToEmployee = (asset, user) => {
+  if (String(asset.assignedToEmployeeId || '') === String(user?._id || '')) return true;
+
+  const fullName = normalizeText(`${user?.firstName || ''} ${user?.lastName || ''}`);
+  const currentEmployee = normalizeText(asset.currentEmployee);
+  if (fullName && currentEmployee === fullName) return true;
+
+  const employeeCode = normalizeText(user?.employeeCode);
+  if (employeeCode && currentEmployee.includes(employeeCode)) return true;
+
+  return false;
+};
+
 const assetController = {
-  // Get all assets with pagination, search, and filters
   getAssets: async (req, res) => {
     try {
       const { search, status, category, location, page = 1, limit = 10 } = req.query;
-      
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+      const role = normalizeRole(req.user?.role);
+
       if (isConnected()) {
-        // Use MongoDB
-        const query = {};
-        if (search) {
-          query.$or = [
-            { name: { $regex: search, $options: 'i' } },
-            { assetTag: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } }
-          ];
+        const query = {
+          orgId: req.user.orgId,
+          isDeleted: { $ne: true },
+        };
+
+        if (role === 'EMPLOYEE') {
+          query.$and = [buildEmployeeVisibilityQuery(req.user)];
         }
+
+        if (search) {
+          const searchFilter = {
+            $or: [
+              { name: { $regex: search, $options: 'i' } },
+              { assetTag: { $regex: search, $options: 'i' } },
+              { description: { $regex: search, $options: 'i' } },
+              { currentEmployee: { $regex: search, $options: 'i' } },
+            ],
+          };
+
+          if (query.$and) query.$and.push(searchFilter);
+          else query.$or = searchFilter.$or;
+        }
+
         if (status) query.status = status;
         if (category) query.category = { $regex: category, $options: 'i' };
-        if (location) {
-          query.currentLocation = { $regex: location, $options: 'i' };
-        }
+        if (location) query.currentLocation = { $regex: location, $options: 'i' };
 
         const total = await Asset.countDocuments(query);
         const data = await Asset.find(query)
-          .limit(parseInt(limit))
-          .skip((parseInt(page) - 1) * parseInt(limit))
+          .sort({ createdAt: -1 })
+          .limit(limitNum)
+          .skip((pageNum - 1) * limitNum)
           .lean();
 
-        res.json({
-          data,
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total,
-            pages: Math.ceil(total / parseInt(limit))
-          }
-        });
-      } else {
-        // Use mock database
-        const assets = MockDB.getAssets();
-        let filtered = assets;
-
-        if (search) {
-          const searchLower = search.toLowerCase();
-          filtered = filtered.filter(a =>
-            a.name?.toLowerCase().includes(searchLower) ||
-            a.assetTag?.toLowerCase().includes(searchLower) ||
-            a.description?.toLowerCase().includes(searchLower)
-          );
-        }
-        if (status) filtered = filtered.filter(a => a.status === status);
-        if (category) {
-          const categoryLower = category.toLowerCase();
-          filtered = filtered.filter(a => String(a.category || '').toLowerCase().includes(categoryLower));
-        }
-        if (location) {
-          const locationLower = location.toLowerCase();
-          filtered = filtered.filter(a => {
-            const assetLocation = String(a.currentLocation || a.location || '').toLowerCase();
-            return assetLocation.includes(locationLower);
-          });
-        }
-
-        const total = filtered.length;
-        const pageNum = parseInt(page);
-        const limitNum = parseInt(limit);
-        const data = filtered.slice((pageNum - 1) * limitNum, pageNum * limitNum);
-
-        res.json({
+        return res.json({
           data,
           pagination: {
             page: pageNum,
             limit: limitNum,
             total,
-            pages: Math.ceil(total / limitNum)
-          }
+            pages: Math.ceil(total / limitNum) || 1,
+          },
         });
       }
+
+      const orgId = normalizeOrgId(req.user?.orgId);
+      let filtered = MockDB.getAssets().filter((asset) => normalizeOrgId(asset.orgId) === orgId);
+
+      if (role === 'EMPLOYEE') {
+        filtered = filtered.filter((asset) => isMockAssetVisibleToEmployee(asset, req.user));
+      }
+
+      if (search) {
+        const searchLower = String(search).toLowerCase();
+        filtered = filtered.filter((a) =>
+          a.name?.toLowerCase().includes(searchLower) ||
+          a.assetTag?.toLowerCase().includes(searchLower) ||
+          a.description?.toLowerCase().includes(searchLower) ||
+          a.currentEmployee?.toLowerCase().includes(searchLower)
+        );
+      }
+
+      if (status) filtered = filtered.filter((a) => a.status === status);
+      if (category) filtered = filtered.filter((a) => String(a.category || '').toLowerCase().includes(String(category).toLowerCase()));
+      if (location) {
+        const locationLower = String(location).toLowerCase();
+        filtered = filtered.filter((a) => String(a.currentLocation || a.location || '').toLowerCase().includes(locationLower));
+      }
+
+      const total = filtered.length;
+      const data = filtered.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+      return res.json({
+        data,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          pages: Math.ceil(total / limitNum) || 1,
+        },
+      });
     } catch (error) {
       console.error('Error fetching assets:', error);
-      res.status(500).json({ message: 'Failed to fetch assets', error: error.message });
+      return res.status(500).json({ message: 'Failed to fetch assets', error: error.message });
     }
   },
 
-  // Create new asset
   createAsset: async (req, res) => {
     try {
-      const { assetId, category, manufacturer, model, serialNumber, status, currentEmployee, currentLocation, purchaseDate, warrantyExpiryDate, notes } = req.body;
+      const {
+        assetId,
+        category,
+        manufacturer,
+        model,
+        serialNumber,
+        status,
+        currentEmployee,
+        currentLocation,
+        purchaseDate,
+        warrantyExpiryDate,
+        notes,
+        assignedToEmployeeId,
+      } = req.body;
 
-      // Validate required fields
       if (!assetId) {
         return res.status(400).json({ message: 'Asset ID is required' });
       }
 
+      const normalizedEmployeeName = String(currentEmployee || '').trim();
+      const normalizedAssignedEmployeeId = assignedToEmployeeId || null;
+      const normalizedStatus = normalizedAssignedEmployeeId ? 'Assigned' : (status || 'Available');
+
       if (isConnected()) {
-        // Use MongoDB
         const asset = await Asset.create({
           orgId: req.user.orgId,
           createdBy: req.user._id,
@@ -109,120 +175,160 @@ const assetController = {
           manufacturer,
           model,
           serialNumber: serialNumber || `SN-${assetId}`,
-          status: status || 'Available',
+          status: normalizedStatus,
           currentLocation,
-          currentEmployee,
+          currentEmployee: normalizedEmployeeName,
+          assignedToEmployeeId: normalizedAssignedEmployeeId,
           purchaseDate,
           warrantyExpiryDate,
-          createdAt: new Date()
+          createdAt: new Date(),
         });
-        res.status(201).json(asset);
-      } else {
-        // Use mock database
-        const asset = MockDB.createAsset({
-          assetId,
-          name: assetId || manufacturer || 'Unnamed Asset',
-          assetTag: assetId,
-          description: notes,
-          category,
-          manufacturer,
-          model,
-          status: status || 'Available',
-          location: currentLocation,
-          assignedTo: currentEmployee,
-          purchaseDate,
-          warrantyExpiryDate
-        });
-        res.status(201).json(asset);
+
+        return res.status(201).json({ data: asset });
       }
+
+      const asset = MockDB.createAsset({
+        orgId: req.user.orgId,
+        assetId,
+        name: assetId || manufacturer || 'Unnamed Asset',
+        assetTag: assetId,
+        description: notes,
+        category,
+        manufacturer,
+        model,
+        status: normalizedStatus,
+        currentLocation,
+        currentEmployee: normalizedEmployeeName,
+        assignedToEmployeeId: normalizedAssignedEmployeeId,
+        purchaseDate,
+        warrantyExpiryDate,
+      });
+
+      return res.status(201).json({ data: asset });
     } catch (error) {
       console.error('Error creating asset:', error);
-      res.status(500).json({ message: 'Failed to create asset', error: error.message });
+      return res.status(500).json({ message: 'Failed to create asset', error: error.message });
     }
   },
 
-  // Get single asset by ID
   getAssetById: async (req, res) => {
     try {
       const { id } = req.params;
+      const role = normalizeRole(req.user?.role);
 
       if (isConnected()) {
-        const asset = await Asset.findById(id).lean();
+        const query = { _id: id, orgId: req.user.orgId, isDeleted: { $ne: true } };
+        if (role === 'EMPLOYEE') {
+          query.$and = [buildEmployeeVisibilityQuery(req.user)];
+        }
+
+        const asset = await Asset.findOne(query).lean();
         if (!asset) return res.status(404).json({ message: 'Asset not found' });
-        res.json(asset);
-      } else {
-        const asset = MockDB.getAssetById(id);
-        if (!asset) return res.status(404).json({ message: 'Asset not found' });
-        res.json(asset);
+        return res.json({ data: asset });
       }
+
+      const asset = MockDB.getAssetById(id);
+      if (!asset || normalizeOrgId(asset.orgId) !== normalizeOrgId(req.user?.orgId)) {
+        return res.status(404).json({ message: 'Asset not found' });
+      }
+      if (role === 'EMPLOYEE' && !isMockAssetVisibleToEmployee(asset, req.user)) {
+        return res.status(404).json({ message: 'Asset not found' });
+      }
+
+      return res.json({ data: asset });
     } catch (error) {
       console.error('Error fetching asset:', error);
-      res.status(500).json({ message: 'Failed to fetch asset', error: error.message });
+      return res.status(500).json({ message: 'Failed to fetch asset', error: error.message });
     }
   },
 
-  // Update asset
   updateAsset: async (req, res) => {
     try {
       const { id } = req.params;
-      const updates = req.body;
+      const updates = { ...req.body };
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'assignedToEmployeeId')) {
+        updates.assignedToEmployeeId = updates.assignedToEmployeeId || null;
+      }
+      if (updates.assignedToEmployeeId) {
+        updates.status = 'Assigned';
+      }
 
       if (isConnected()) {
-        const asset = await Asset.findByIdAndUpdate(id, { ...updates, updatedAt: new Date() }, { new: true }).lean();
+        const asset = await Asset.findOneAndUpdate(
+          { _id: id, orgId: req.user.orgId, isDeleted: { $ne: true } },
+          { ...updates, updatedAt: new Date(), updatedBy: req.user._id },
+          { new: true }
+        ).lean();
+
         if (!asset) return res.status(404).json({ message: 'Asset not found' });
-        res.json(asset);
-      } else {
-        const asset = MockDB.updateAsset(id, updates);
-        if (!asset) return res.status(404).json({ message: 'Asset not found' });
-        res.json(asset);
+        return res.json({ data: asset });
       }
+
+      const existing = MockDB.getAssetById(id);
+      if (!existing || normalizeOrgId(existing.orgId) !== normalizeOrgId(req.user?.orgId)) {
+        return res.status(404).json({ message: 'Asset not found' });
+      }
+
+      const asset = MockDB.updateAsset(id, updates);
+      return res.json({ data: asset });
     } catch (error) {
       console.error('Error updating asset:', error);
-      res.status(500).json({ message: 'Failed to update asset', error: error.message });
+      return res.status(500).json({ message: 'Failed to update asset', error: error.message });
     }
   },
 
-  // Delete asset
   deleteAsset: async (req, res) => {
     try {
       const { id } = req.params;
 
       if (isConnected()) {
-        const asset = await Asset.findByIdAndDelete(id);
+        const asset = await Asset.findOneAndDelete({ _id: id, orgId: req.user.orgId });
         if (!asset) return res.status(404).json({ message: 'Asset not found' });
-        res.json({ message: 'Asset deleted successfully' });
-      } else {
-        const asset = MockDB.deleteAsset(id);
-        if (!asset) return res.status(404).json({ message: 'Asset not found' });
-        res.json({ message: 'Asset deleted successfully' });
+        return res.json({ message: 'Asset deleted successfully' });
       }
+
+      const existing = MockDB.getAssetById(id);
+      if (!existing || normalizeOrgId(existing.orgId) !== normalizeOrgId(req.user?.orgId)) {
+        return res.status(404).json({ message: 'Asset not found' });
+      }
+
+      MockDB.deleteAsset(id);
+      return res.json({ message: 'Asset deleted successfully' });
     } catch (error) {
       console.error('Error deleting asset:', error);
-      res.status(500).json({ message: 'Failed to delete asset', error: error.message });
+      return res.status(500).json({ message: 'Failed to delete asset', error: error.message });
     }
   },
 
-  // Export assets as CSV
   exportAssets: async (req, res) => {
     try {
+      const role = normalizeRole(req.user?.role);
+      let assets = [];
+
       if (isConnected()) {
-        const assets = await Asset.find({}).lean();
-        const csv = convertToCSV(assets);
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', 'attachment; filename=assets.csv');
-        res.send(csv);
+        const query = { orgId: req.user.orgId, isDeleted: { $ne: true } };
+        if (role === 'EMPLOYEE') {
+          query.$and = [buildEmployeeVisibilityQuery(req.user)];
+        }
+        assets = await Asset.find(query).lean();
       } else {
-        const assets = MockDB.getAssets();
-        const csv = convertToCSV(assets);
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', 'attachment; filename=assets.csv');
-        res.send(csv);
+        const orgId = normalizeOrgId(req.user?.orgId);
+        assets = MockDB.getAssets().filter((asset) => normalizeOrgId(asset.orgId) === orgId);
+        if (role === 'EMPLOYEE') {
+          assets = assets.filter((asset) => isMockAssetVisibleToEmployee(asset, req.user));
+        }
       }
+
+      const csv = convertToCSV(assets);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=assets.csv');
+      return res.send(csv);
     } catch (error) {
       console.error('Error exporting assets:', error);
-      res.status(500).json({ message: 'Failed to export assets', error: error.message });
+      return res.status(500).json({ message: 'Failed to export assets', error: error.message });
     }
-  }
+  },
 };
 
 function convertToCSV(data) {
@@ -230,7 +336,7 @@ function convertToCSV(data) {
   const headers = Object.keys(data[0]);
   const csv = [headers.join(',')];
   for (const row of data) {
-    csv.push(headers.map(h => JSON.stringify(row[h] || '')).join(','));
+    csv.push(headers.map((h) => JSON.stringify(row[h] || '')).join(','));
   }
   return csv.join('\n');
 }

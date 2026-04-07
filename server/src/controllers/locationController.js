@@ -8,7 +8,7 @@ const locationController = {
       const { search, status, page = 1, limit = 10 } = req.query;
 
       if (isConnected()) {
-        let query = {};
+        const query = { orgId: req.user.orgId };
         if (search) {
           query.$or = [
             { name: { $regex: search, $options: 'i' } },
@@ -19,6 +19,7 @@ const locationController = {
 
         const total = await Location.countDocuments(query);
         const data = await Location.find(query)
+          .sort({ createdAt: -1 })
           .limit(parseInt(limit))
           .skip((parseInt(page) - 1) * parseInt(limit))
           .lean();
@@ -110,7 +111,7 @@ const locationController = {
       const { id } = req.params;
 
       if (isConnected()) {
-        const location = await Location.findById(id).lean();
+        const location = await Location.findOne({ _id: id, orgId: req.user.orgId }).lean();
         if (!location) return res.status(404).json({ message: 'Location not found' });
         res.json(location);
       } else {
@@ -130,7 +131,11 @@ const locationController = {
       const updates = req.body;
 
       if (isConnected()) {
-        const location = await Location.findByIdAndUpdate(id, { ...updates, updatedAt: new Date() }, { new: true }).lean();
+        const location = await Location.findOneAndUpdate(
+          { _id: id, orgId: req.user.orgId },
+          { ...updates, updatedAt: new Date() },
+          { new: true }
+        ).lean();
         if (!location) return res.status(404).json({ message: 'Location not found' });
         res.json(location);
       } else {
@@ -149,7 +154,7 @@ const locationController = {
       const { id } = req.params;
 
       if (isConnected()) {
-        const location = await Location.findByIdAndDelete(id);
+        const location = await Location.findOneAndDelete({ _id: id, orgId: req.user.orgId });
         if (!location) return res.status(404).json({ message: 'Location not found' });
         res.json({ message: 'Location deleted successfully' });
       } else {

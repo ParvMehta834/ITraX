@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { safeJson } from '../utils/safeJson'
 import { buildApiUrl } from '../utils/apiUrl'
+import { setAuthSession } from '../utils/authStorage'
 
 export default function Signup({ onSignup }) {
   const [email, setEmail] = useState('')
@@ -52,8 +53,7 @@ export default function Signup({ onSignup }) {
         return setErr('Signup succeeded but response was empty')
       }
 
-      localStorage.setItem('itrax_token', data.token)
-      localStorage.setItem('itrax_user', JSON.stringify(data.user))
+      setAuthSession({ token: data.token, user: data.user })
       onSignup && onSignup(data.user)
       if (data.user.role === 'ADMIN') nav('/admin/assets')
       else nav('/employee/my-assets')

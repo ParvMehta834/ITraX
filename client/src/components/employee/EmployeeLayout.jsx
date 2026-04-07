@@ -1,5 +1,6 @@
 import React from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { clearAuthSession } from '../../utils/authStorage'
 
 const navItems = [
 	{ to: '/employee/assets', label: 'My Assets' },
@@ -14,8 +15,7 @@ export default function EmployeeLayout() {
 	const navigate = useNavigate()
 
 	const logout = () => {
-		localStorage.removeItem('itrax_token')
-		localStorage.removeItem('itrax_user')
+		clearAuthSession()
 		navigate('/login')
 	}
 

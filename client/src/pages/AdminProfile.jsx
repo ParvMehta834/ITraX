@@ -1,14 +1,11 @@
 import React, { useMemo, useState } from 'react'
 import Avatar from '../components/Avatar'
 import employeeService from '../services/employeeService'
+import { getAuthUser, setAuthSession } from '../utils/authStorage'
 
 export default function AdminProfile() {
   const user = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem('itrax_user') || '{"name":"User"}')
-    } catch {
-      return { name: 'User' }
-    }
+    return getAuthUser() || { name: 'User' }
   }, [])
 
   const [form, setForm] = useState({
@@ -39,7 +36,7 @@ export default function AdminProfile() {
 
       const result = await employeeService.updateProfile(payload)
       const updatedUser = result?.user || {}
-      localStorage.setItem('itrax_user', JSON.stringify({ ...user, ...updatedUser, name: `${updatedUser.firstName || form.firstName} ${updatedUser.lastName || form.lastName}`.trim() }))
+      setAuthSession({ user: { ...user, ...updatedUser, name: `${updatedUser.firstName || form.firstName} ${updatedUser.lastName || form.lastName}`.trim() } })
       setForm((prev) => ({ ...prev, password: '' }))
       setMessage({ type: 'success', text: 'Profile updated successfully.' })
     } catch (err) {

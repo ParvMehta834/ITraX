@@ -26,16 +26,10 @@ import AssetDetail from './pages/AssetDetail'
 import Tracking from './pages/Tracking'
 import AdminProfile from './pages/AdminProfile'
 import ToastProvider from './components/Toast'
+import { clearAuthSession, getAuthUser } from './utils/authStorage'
 
 const readStoredUser = () => {
-  const raw = localStorage.getItem('itrax_user')
-  if (!raw) return null
-  try {
-    return JSON.parse(raw)
-  } catch {
-    localStorage.removeItem('itrax_user')
-    return null
-  }
+  return getAuthUser()
 }
 
 function useAuth() {
@@ -59,8 +53,7 @@ function App() {
   const shouldShowGlobalNav = location.pathname !== '/' && !hideGlobalNavPaths.includes(location.pathname) && !isEmployeeArea
 
   const logout = () => {
-    localStorage.removeItem('itrax_token')
-    localStorage.removeItem('itrax_user')
+    clearAuthSession()
     auth.setUser(null)
     navigate('/')
   }

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
+import { getAuthToken } from '../utils/authStorage'
 
 export default function EmployeeAssets(){
   const [assets, setAssets] = useState([])
   useEffect(()=>{fetchAssets()}, [])
   async function fetchAssets(){
-    const token = localStorage.getItem('itrax_token')
+    const token = getAuthToken()
     const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/employee/assets`, { headers: { Authorization: `Bearer ${token}` } })
     if (!res.ok) return setAssets([])
     const data = await res.json()

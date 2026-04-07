@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { buildApiUrl } from '../utils/apiUrl';
+import { clearAuthSession, getAuthToken, setAuthSession } from '../utils/authStorage';
 
 const apiClient = axios.create({
   withCredentials: true
@@ -12,7 +13,7 @@ if (/^https?:\/\//i.test(apiBase)) {
 }
 
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('itrax_token');
+  const token = getAuthToken();
   if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
@@ -38,15 +39,14 @@ apiClient.interceptors.response.use(
       const refreshResponse = await apiClient.post(buildApiUrl('/auth/refresh'), {}, { withCredentials: true });
       const newToken = refreshResponse?.data?.token;
       if (!newToken) throw new Error('Refresh did not return a token');
-      localStorage.setItem('itrax_token', newToken);
+      setAuthSession({ token: newToken, user: refreshResponse?.data?.user });
       config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${newToken}`;
       return apiClient(config);
     } catch (refreshError) {
       const refreshStatus = refreshError?.response?.status;
       if (refreshStatus === 401 || refreshStatus === 403) {
-        localStorage.removeItem('itrax_token');
-        localStorage.removeItem('itrax_user');
+        clearAuthSession();
       }
       return Promise.reject(refreshError);
     }

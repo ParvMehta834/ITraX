@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useToast } from '../components/Toast'
+import { getAuthToken } from '../utils/authStorage'
 
 export default function AssetDetail(){
   const { id } = useParams()
@@ -9,14 +10,14 @@ export default function AssetDetail(){
   const toast = useToast()
   useEffect(()=>{ fetchAsset() }, [id])
   async function fetchAsset(){
-    const token = localStorage.getItem('itrax_token')
+    const token = getAuthToken()
     const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/assets`, { headers: { Authorization: `Bearer ${token}` } })
     const data = await res.json()
     const a = data.data.find(x=> x._id === id)
     setAsset(a)
   }
   async function reassign(){
-    const token = localStorage.getItem('itrax_token')
+    const token = getAuthToken()
     const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/assets/${id}`, { method: 'PATCH', headers: { 'Content-Type':'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ currentEmployeeId: employeeId }) })
     const data = await res.json()
     if (res.ok){ toast.push('Reassigned'); setAsset(data.asset) }

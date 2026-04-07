@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Download, Filter } from 'lucide-react';
 import orderService from '../services/orderService';
+import locationsService from '../services/locationsService';
 import OrderCard from '../components/OrderCard';
 import AddEditOrderModal from '../components/AddEditOrderModal';
 
@@ -22,6 +23,7 @@ export default function TrackingPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [searchDebounce, setSearchDebounce] = useState(null);
+  const [locations, setLocations] = useState([]);
 
   // Fetch orders
   const fetchOrders = useCallback(
@@ -72,6 +74,19 @@ export default function TrackingPage() {
   // Initial fetch
   useEffect(() => {
     fetchOrders(1);
+  }, []);
+
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        const response = await locationsService.getLocations({ limit: 500, status: 'Active' });
+        setLocations((response?.data || []).map((loc) => loc.name));
+      } catch {
+        setLocations([]);
+      }
+    };
+
+    loadLocations();
   }, []);
 
   const showToast = (message, type = 'success') => {
@@ -298,6 +313,7 @@ export default function TrackingPage() {
         onClose={closeModal}
         onSuccess={handleOrderSaved}
         order={selectedOrder}
+        locations={locations}
       />
 
       {/* Toast */}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import employeeService from '../../services/employeeService'
+import { getAuthUser } from '../../utils/authStorage'
 
 export default function EmployeeOrdersPage() {
   const [orders, setOrders] = useState([])
@@ -9,12 +10,7 @@ export default function EmployeeOrdersPage() {
     const load = async () => {
       setLoading(true)
       try {
-        let currentUser = null
-        try {
-          currentUser = JSON.parse(localStorage.getItem('itrax_user') || 'null')
-        } catch {
-          currentUser = null
-        }
+        const currentUser = getAuthUser()
 
         const body = await employeeService.getOrders({
           limit: 100,

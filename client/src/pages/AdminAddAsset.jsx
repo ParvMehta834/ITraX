@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { getAuthToken } from '../utils/authStorage'
 
 export default function AdminAddAsset(){
   const [assetId, setAssetId] = useState('')
@@ -14,7 +15,7 @@ export default function AdminAddAsset(){
     fd.append('manufacturer', manufacturer);
     fd.append('model', model);
     if (file) fd.append('image', file);
-    const token = localStorage.getItem('itrax_token')
+    const token = getAuthToken()
     const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/assets`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
     const data = await res.json()
     if (res.ok) setMsg('Asset created')

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Download, Filter, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import inventoryService from '../services/inventoryService';
+import locationsService from '../services/locationsService';
 import AddEditInventoryModal from '../components/AddEditInventoryModal';
 
 export default function AdminInventory() {
@@ -22,7 +23,7 @@ export default function AdminInventory() {
   const [locationFilter, setLocationFilter] = useState('');
   const [searchDebounce, setSearchDebounce] = useState(null);
 
-  // Get unique locations for filter
+  // Canonical locations from admin location master
   const [locations, setLocations] = useState([]);
 
   // Fetch items
@@ -50,9 +51,7 @@ export default function AdminInventory() {
           totalPages: paging.pages ?? 1
         });
 
-        // Extract unique locations
-        const uniqueLocations = [...new Set((result.data || []).map(item => item.location))];
-        setLocations(uniqueLocations);
+        // Keep table data sync only; location options come from locations API
       } catch (err) {
         showToast('Failed to fetch inventory items', 'error');
         console.error(err);
@@ -79,6 +78,19 @@ export default function AdminInventory() {
   useEffect(() => {
     fetchItems(1);
   }, [locationFilter]);
+
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        const response = await locationsService.getLocations({ limit: 500, status: 'Active' });
+        setLocations((response?.data || []).map((loc) => loc.name));
+      } catch {
+        setLocations([]);
+      }
+    };
+
+    loadLocations();
+  }, []);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -421,6 +433,7 @@ export default function AdminInventory() {
         onClose={closeModal}
         onSuccess={handleItemSaved}
         item={selectedItem}
+        locations={locations}
       />
 
       {/* Toast */}

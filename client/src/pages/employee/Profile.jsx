@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import employeeService from '../../services/employeeService'
+import { getAuthUser, setAuthSession } from '../../utils/authStorage'
 
 export default function EmployeeProfilePage() {
   const [profile, setProfile] = useState(null)
@@ -49,11 +50,8 @@ export default function EmployeeProfilePage() {
       setProfile(user)
       setForm((prev) => ({ ...prev, password: '' }))
 
-      const raw = localStorage.getItem('itrax_user')
-      if (raw) {
-        const existing = JSON.parse(raw)
-        localStorage.setItem('itrax_user', JSON.stringify({ ...existing, ...user, name: `${user.firstName || ''} ${user.lastName || ''}`.trim() }))
-      }
+      const existing = getAuthUser() || {}
+      setAuthSession({ user: { ...existing, ...user, name: `${user.firstName || ''} ${user.lastName || ''}`.trim() } })
 
       setMessage({ type: 'success', text: 'Profile updated successfully.' })
     } catch (err) {

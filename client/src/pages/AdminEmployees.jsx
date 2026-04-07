@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Download, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import employeesService from '../services/employeesService';
+import locationsService from '../services/locationsService';
 import AddEditEmployeeModal from '../components/AddEditEmployeeModal';
 
 export default function AdminEmployees() {
@@ -13,6 +14,7 @@ export default function AdminEmployees() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [toast, setToast] = useState(null);
   const [actionMenu, setActionMenu] = useState(null);
+  const [locations, setLocations] = useState([]);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -59,6 +61,19 @@ export default function AdminEmployees() {
 
   useEffect(() => {
     fetchEmployees(1);
+  }, []);
+
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        const response = await locationsService.getLocations({ limit: 500, status: 'Active' });
+        setLocations(response?.data || []);
+      } catch {
+        setLocations([]);
+      }
+    };
+
+    loadLocations();
   }, []);
 
   const handleEdit = (employee) => {
@@ -294,6 +309,7 @@ export default function AdminEmployees() {
         onClose={handleModalClose}
         onSuccess={handleModalSuccess}
         employee={selectedEmployee}
+        locations={locations}
       />
 
       {deleteConfirm && (

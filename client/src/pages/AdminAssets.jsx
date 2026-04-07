@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import assetService from '../services/assetService';
+import employeesService from '../services/employeesService';
+import locationsService from '../services/locationsService';
 import AddEditAssetModal from '../components/AddEditAssetModal';
 import FilterDrawer from '../components/FilterDrawer';
 import StatusBadge from '../components/StatusBadge';
@@ -19,6 +21,8 @@ export default function AdminAssets() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [toast, setToast] = useState(null);
   const [actionMenu, setActionMenu] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [locations, setLocations] = useState([]);
 
   // Filter state
   const [search, setSearch] = useState('');
@@ -76,6 +80,25 @@ export default function AdminAssets() {
   // Initial fetch
   useEffect(() => {
     fetchAssets(1);
+  }, []);
+
+  useEffect(() => {
+    const loadDependencies = async () => {
+      try {
+        const [employeesRes, locationsRes] = await Promise.all([
+          employeesService.getEmployees({ limit: 500 }),
+          locationsService.getLocations({ limit: 500, status: 'Active' })
+        ]);
+
+        setEmployees(employeesRes?.data || []);
+        setLocations(locationsRes?.data || []);
+      } catch {
+        setEmployees([]);
+        setLocations([]);
+      }
+    };
+
+    loadDependencies();
   }, []);
 
   const showToast = (message, type = 'success') => {
@@ -361,6 +384,8 @@ export default function AdminAssets() {
         onClose={closeModal}
         onSuccess={handleAssetSaved}
         asset={selectedAsset}
+        employees={employees}
+        locations={locations}
       />
 
       <FilterDrawer

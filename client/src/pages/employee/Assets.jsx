@@ -1,16 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import employeeService from '../../services/employeeService'
+import { getAuthUser } from '../../utils/authStorage'
 
 export default function EmployeeAssetsPage() {
   const [assets, setAssets] = useState([])
   const [loading, setLoading] = useState(true)
 
   const currentUser = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem('itrax_user') || 'null')
-    } catch {
-      return null
-    }
+    return getAuthUser()
   }, [])
 
   useEffect(() => {
@@ -19,12 +16,7 @@ export default function EmployeeAssetsPage() {
       try {
         const body = await employeeService.getAssets({ limit: 200 })
         const rows = body?.data || []
-        const fullName = `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim()
-        const mine = rows.filter((a) => {
-          if (!fullName) return true
-          return String(a.currentEmployee || '').trim().toLowerCase() === fullName.toLowerCase()
-        })
-        setAssets(mine)
+        setAssets(rows)
       } catch {
         setAssets([])
       } finally {
