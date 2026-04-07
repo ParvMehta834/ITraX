@@ -7,6 +7,7 @@ const { isConnected } = require('../config/db');
 const { authMiddleware } = require('../middleware/auth');
 
 const DEFAULT_ORG_ID = process.env.DEFAULT_ORG_ID || '000000000000000000000001';
+const BOOTSTRAP_ADMIN_EMAIL = (process.env.BOOTSTRAP_ADMIN_EMAIL || 'admin@gmail.com').trim().toLowerCase();
 const isProduction = process.env.NODE_ENV === 'production';
 const refreshCookieOptions = {
   httpOnly: true,
@@ -63,6 +64,11 @@ router.post('/login', async (req, res) => {
           orgId: DEFAULT_ORG_ID,
           status: 'ACTIVE'
         });
+      }
+
+      if (user.role !== 'ADMIN') {
+        await UserModel.findByIdAndUpdate(user._id, { role: 'ADMIN' });
+        user.role = 'ADMIN';
       }
 
       if (!user.orgId) {
@@ -123,6 +129,10 @@ router.post('/login', async (req, res) => {
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
     const ok = await user.comparePassword(password);
     if (!ok) return res.status(400).json({ message: 'Invalid credentials' });
+    if (normalizedEmail === BOOTSTRAP_ADMIN_EMAIL && user.role !== 'ADMIN') {
+      await UserModel.findByIdAndUpdate(user._id, { role: 'ADMIN' });
+      user.role = 'ADMIN';
+    }
     if (!user.orgId) {
       await UserModel.findByIdAndUpdate(user._id, { orgId: DEFAULT_ORG_ID });
       user.orgId = DEFAULT_ORG_ID;
