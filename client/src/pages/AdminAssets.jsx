@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import assetService from '../services/assetService';
 import employeesService from '../services/employeesService';
 import locationsService from '../services/locationsService';
+import categoriesService from '../services/categoriesService';
 import AddEditAssetModal from '../components/AddEditAssetModal';
 import FilterDrawer from '../components/FilterDrawer';
 import StatusBadge from '../components/StatusBadge';
@@ -23,6 +24,7 @@ export default function AdminAssets() {
   const [actionMenu, setActionMenu] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [categories, setCategories] = useState([]);
 
   // Filter state
   const [search, setSearch] = useState('');
@@ -85,16 +87,19 @@ export default function AdminAssets() {
   useEffect(() => {
     const loadDependencies = async () => {
       try {
-        const [employeesRes, locationsRes] = await Promise.all([
+        const [employeesRes, locationsRes, categoriesRes] = await Promise.all([
           employeesService.getEmployees({ limit: 500 }),
-          locationsService.getLocations({ limit: 500, status: 'Active' })
+          locationsService.getLocations({ limit: 500, status: 'Active' }),
+          categoriesService.getCategories({ limit: 500 })
         ]);
 
         setEmployees(employeesRes?.data || []);
         setLocations(locationsRes?.data || []);
+        setCategories(categoriesRes?.data || []);
       } catch {
         setEmployees([]);
         setLocations([]);
+        setCategories([]);
       }
     };
 
@@ -386,6 +391,7 @@ export default function AdminAssets() {
         asset={selectedAsset}
         employees={employees}
         locations={locations}
+        categories={categories}
       />
 
       <FilterDrawer

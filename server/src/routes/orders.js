@@ -1,6 +1,7 @@
 const express = require('express');
 const { authMiddleware, requireRole } = require('../middleware/auth');
 const CompanyOrder = require('../models/CompanyOrder');
+const Asset = require('../models/Asset');
 const MockDB = require('../config/mockDb');
 const { isConnected } = require('../config/db');
 const { Parser } = require('json2csv');
@@ -56,7 +57,7 @@ router.get('/', authMiddleware, async (req, res) => {
 
     if (isConnected()) {
       // Build filter
-      const filter = {};
+      const filter = { isDeleted: { $ne: true } };
       if (req.user?.orgId) filter.orgId = req.user.orgId;
       if (search) {
         filter.$or = [
@@ -95,6 +96,7 @@ router.get('/', authMiddleware, async (req, res) => {
     } else {
       // Use mock database
       let allOrders = MockDB.getOrders().filter((order) => {
+        if (order.isDeleted) return false;
         if (!req.user?.orgId) return true;
         return normalizeOrgId(order.orgId || req.user.orgId) === normalizeOrgId(req.user.orgId);
       });
@@ -324,14 +326,14 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req, res) => {
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     if (isConnected()) {
-      const order = await CompanyOrder.findById(req.params.id).populate('createdBy', 'firstName lastName email');
+      const order = await CompanyOrder.findOne({ _id: req.params.id, isDeleted: { $ne: true } }).populate('createdBy', 'firstName lastName email');
       if (!order) {
         return res.status(404).json({ message: 'Order not found' });
       }
       res.json({ order });
     } else {
       const order = MockDB.getOrderById(req.params.id);
-      if (!order) {
+      if (!order || order.isDeleted) {
         return res.status(404).json({ message: 'Order not found' });
       }
       res.json({ order });
@@ -494,6 +496,36 @@ router.patch('/:id/status', authMiddleware, requireRole('ADMIN'), async (req, re
         });
       }
 
+      // If order is delivered, create an asset for the employee
+      if (status === 'Delivered' && order.assignedEmployeeId) {
+        const asset = await Asset.create({
+          orgId: req.user.orgId,
+          createdBy: req.user._id,
+          assetId: order.orderId,
+          name: order.assetName,
+          assetTag: order.orderId,
+          category: 'Device',
+          manufacturer: order.supplier,
+          status: 'Assigned',
+          currentLocation: order.currentLocation,
+          currentEmployee: order.assignedEmployeeName,
+          assignedToEmployeeId: order.assignedEmployeeId,
+          notes: `Delivered via order ${order.orderId}`,
+          createdAt: new Date(),
+        });
+
+        await createNotification({
+          orgId: req.user.orgId,
+          userId: order.assignedEmployeeId,
+          title: 'Asset Delivered and Added',
+          message: `${order.assetName} has been delivered to you and added to your assets.`,
+          type: 'ASSET'
+        });
+
+        // Soft-delete the order (can also hard delete if preferred)
+        await CompanyOrder.findByIdAndUpdate(req.params.id, { isDeleted: true });
+      }
+
       res.json({ order: populated });
     } else {
       const order = MockDB.getOrderById(req.params.id);
@@ -519,6 +551,35 @@ router.patch('/:id/status', authMiddleware, requireRole('ADMIN'), async (req, re
           message: `Order ${order.orderId} status changed to ${status}.`,
           type: 'ORDER'
         });
+      }
+
+      // If order is delivered, create an asset for the employee
+      if (status === 'Delivered' && order.assignedEmployeeId) {
+        const asset = MockDB.createAsset({
+          orgId: req.user.orgId,
+          assetId: order.orderId,
+          name: order.assetName,
+          assetTag: order.orderId,
+          category: 'Device',
+          manufacturer: order.supplier,
+          status: 'Assigned',
+          location: order.currentLocation,
+          currentEmployee: order.assignedEmployeeName,
+          assignedToEmployeeId: order.assignedEmployeeId,
+          description: `Delivered via order ${order.orderId}`,
+        });
+
+        await createNotification({
+          orgId: req.user.orgId,
+          userId: order.assignedEmployeeId,
+          title: 'Asset Delivered and Added',
+          message: `${order.assetName} has been delivered to you and added to your assets.`,
+          type: 'ASSET'
+        });
+
+        // Mark order as deleted in mock
+        order.isDeleted = true;
+        MockDB.updateOrder(req.params.id, order);
       }
 
       res.json({ order });
