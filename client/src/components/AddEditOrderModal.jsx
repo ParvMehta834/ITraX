@@ -71,7 +71,18 @@ export default function AddEditOrderModal({ isOpen, onClose, onSuccess, order = 
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'assignedEmployeeId') {
+      const selectedEmployee = employees.find((emp) => String(emp._id) === String(value));
+      setFormData(prev => ({
+        ...prev,
+        assignedEmployeeId: value,
+        assignedEmployeeName: selectedEmployee
+          ? `${selectedEmployee.firstName || ''} ${selectedEmployee.lastName || ''}`.trim()
+          : prev.assignedEmployeeName
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }

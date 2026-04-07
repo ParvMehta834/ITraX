@@ -26,6 +26,7 @@ const validateOrder = (data) => {
 };
 
 const normalizeOrgId = (orgId) => String(orgId || '');
+const normalizeRole = (role) => String(role || '').trim().toUpperCase();
 
 const userOwnsOrder = (order, user) => {
   if (!order || !user) return false;
@@ -199,6 +200,14 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req, res) => {
         return res.status(400).json({ message: 'Assigned employee not found' });
       }
 
+      if (normalizeRole(assignedUser.role) !== 'EMPLOYEE') {
+        return res.status(400).json({ message: 'Assigned user must be an employee' });
+      }
+
+      if (req.user?.orgId && normalizeOrgId(assignedUser.orgId || req.user.orgId) !== normalizeOrgId(req.user.orgId)) {
+        return res.status(400).json({ message: 'Assigned employee must belong to your organization' });
+      }
+
       resolvedEmployeeId = assignedUser._id;
       resolvedEmployeeCode = assignedUser.employeeCode || '';
       resolvedEmployeeName = `${assignedUser.firstName || ''} ${assignedUser.lastName || ''}`.trim() || resolvedEmployeeName;
@@ -325,11 +334,19 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req, res) => {
     const updatePayload = { ...req.body };
     if (assignedEmployeeId) {
       const assignedUser = isConnected()
-        ? await User.findById(assignedEmployeeId).select('_id firstName lastName employeeCode').lean()
+        ? await User.findById(assignedEmployeeId).select('_id firstName lastName employeeCode role orgId').lean()
         : MockDB.getUsers().find((u) => String(u._id) === String(assignedEmployeeId));
 
       if (!assignedUser) {
         return res.status(400).json({ message: 'Assigned employee not found' });
+      }
+
+      if (normalizeRole(assignedUser.role) !== 'EMPLOYEE') {
+        return res.status(400).json({ message: 'Assigned user must be an employee' });
+      }
+
+      if (req.user?.orgId && normalizeOrgId(assignedUser.orgId || req.user.orgId) !== normalizeOrgId(req.user.orgId)) {
+        return res.status(400).json({ message: 'Assigned employee must belong to your organization' });
       }
 
       updatePayload.assignedEmployeeId = assignedUser._id;
