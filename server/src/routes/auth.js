@@ -24,15 +24,13 @@ router.post('/signup', async (req, res) => {
     const normalizedEmail = email.trim().toLowerCase();
     const existing = await UserModel.findOne({ email: normalizedEmail, orgId: DEFAULT_ORG_ID });
     if (existing) return res.status(400).json({ message: 'User already exists' });
-    const isFirst = (await UserModel.countDocuments({})) === 0;
-    const role = isFirst ? 'ADMIN' : 'EMPLOYEE';
     const hash = await bcrypt.hash(password, 10);
     const user = await UserModel.create({
       firstName,
       lastName,
       email: normalizedEmail,
       passwordHash: hash,
-      role,
+      role: 'ADMIN',
       orgId: DEFAULT_ORG_ID,
     });
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'change_me', { expiresIn: '15m' });
