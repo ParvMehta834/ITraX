@@ -7,6 +7,7 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
     name: '',
     description: '',
     quantity: '',
+    costPerItem: '',
     location: '',
     sku: '',
     reorderLevel: ''
@@ -21,16 +22,18 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
       setFormData({
         name: item.name || '',
         description: item.description || '',
-        quantity: item.quantity || '',
+        quantity: item.quantityOnHand ?? item.quantity ?? '',
+        costPerItem: item.costPerItem ?? '',
         location: item.location || '',
         sku: item.sku || '',
-        reorderLevel: item.reorderLevel || ''
+        reorderLevel: item.quantityMinimum ?? item.reorderLevel ?? ''
       });
     } else {
       setFormData({
         name: '',
         description: '',
         quantity: '',
+        costPerItem: '',
         location: '',
         sku: '',
         reorderLevel: ''
@@ -42,9 +45,9 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
   // Auto-calculate total
   useEffect(() => {
     const qty = parseFloat(formData.quantity) || 0;
-    // Since we don't have cost per item, just show quantity
-    setTotal(qty);
-  }, [formData.quantity]);
+    const cost = parseFloat(formData.costPerItem) || 0;
+    setTotal(qty * cost);
+  }, [formData.quantity, formData.costPerItem]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -67,6 +70,10 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
     } else if (formData.quantity < 0) {
       newErrors.quantity = 'Quantity must be 0 or greater';
     }
+
+    if (formData.costPerItem !== '' && Number(formData.costPerItem) < 0) {
+      newErrors.costPerItem = 'Price must be 0 or greater';
+    }
     
     if (formData.reorderLevel && formData.reorderLevel < 0) {
       newErrors.reorderLevel = 'Reorder level must be 0 or greater';
@@ -87,6 +94,7 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
         name: formData.name.trim(),
         description: formData.description.trim(),
         quantity: parseInt(formData.quantity, 10),
+        costPerItem: formData.costPerItem === '' ? 0 : parseFloat(formData.costPerItem),
         location: formData.location || undefined,
         sku: formData.sku.trim() || undefined,
         reorderLevel: formData.reorderLevel ? parseInt(formData.reorderLevel, 10) : undefined
@@ -164,7 +172,7 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
               />
             </div>
 
-            {/* Quantity & Location Row */}
+            {/* Quantity & Price Row */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -185,6 +193,26 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Price per Item
+                </label>
+                <input
+                  type="number"
+                  name="costPerItem"
+                  value={formData.costPerItem}
+                  onChange={handleChange}
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {errors.costPerItem && <p className="text-red-500 text-xs mt-1">{errors.costPerItem}</p>}
+              </div>
+            </div>
+
+            {/* Location & Total Row */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Location
                 </label>
                 <input
@@ -194,6 +222,18 @@ export default function AddEditInventoryModal({ isOpen, onClose, onSuccess, item
                   onChange={handleChange}
                   placeholder="e.g., Warehouse A"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Total Value
+                </label>
+                <input
+                  type="text"
+                  value={`$${Number.isFinite(total) ? total.toFixed(2) : '0.00'}`}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-700 rounded-md"
                 />
               </div>
             </div>
