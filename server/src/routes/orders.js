@@ -47,6 +47,97 @@ const generateOrderId = async () => {
   return `ORD-${timestamp}-${count + 1}`;
 };
 
+const syncDeliveredOrderToAsset = async (order, reqUser) => {
+  const assignedEmployeeId = order?.assignedEmployeeId?._id || order?.assignedEmployeeId || null;
+  if (order?.status !== 'Delivered' || !assignedEmployeeId) {
+    return null;
+  }
+
+  const resolvedOrgId = order?.orgId || reqUser?.orgId;
+  if (!resolvedOrgId) {
+    return null;
+  }
+
+  let resolvedEmployeeName = String(order.assignedEmployeeName || '').trim();
+  if (!resolvedEmployeeName && isConnected()) {
+    const assignedUser = await User.findById(assignedEmployeeId).select('firstName lastName').lean();
+    resolvedEmployeeName = `${assignedUser?.firstName || ''} ${assignedUser?.lastName || ''}`.trim();
+  }
+
+  const assetPayload = {
+    orgId: resolvedOrgId,
+    assetId: order.orderId,
+    assetTag: order.orderId,
+    name: order.assetName,
+    category: 'Device',
+    manufacturer: order.supplier,
+    status: 'Assigned',
+    currentLocation: order.currentLocation,
+    currentEmployee: resolvedEmployeeName,
+    assignedToEmployeeId: assignedEmployeeId,
+    notes: `Delivered via order ${order.orderId}`,
+  };
+
+  let asset;
+  if (isConnected()) {
+    asset = await Asset.findOneAndUpdate(
+      { orgId: resolvedOrgId, assetTag: order.orderId },
+      {
+        $set: {
+          ...assetPayload,
+          isDeleted: false,
+          updatedAt: new Date(),
+          updatedBy: reqUser._id,
+        },
+        $setOnInsert: {
+          createdAt: new Date(),
+          createdBy: reqUser._id,
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    ).lean();
+
+    await CompanyOrder.findByIdAndUpdate(order._id, { isDeleted: true });
+  } else {
+    const orgId = normalizeOrgId(resolvedOrgId);
+    const existingAsset = MockDB.getAssets().find((candidate) => {
+      const candidateOrgId = normalizeOrgId(candidate.orgId);
+      const candidateTag = String(candidate.assetTag || candidate.assetId || '');
+      return candidateOrgId === orgId && candidateTag === String(order.orderId || '');
+    });
+
+    if (existingAsset) {
+      asset = MockDB.updateAsset(existingAsset._id, {
+        ...assetPayload,
+        location: order.currentLocation,
+        description: assetPayload.notes,
+      });
+    } else {
+      asset = MockDB.createAsset({
+        ...assetPayload,
+        location: order.currentLocation,
+        description: assetPayload.notes,
+      });
+    }
+
+    const existingOrder = MockDB.getOrderById(order._id);
+    if (existingOrder) {
+      existingOrder.isDeleted = true;
+      MockDB.updateOrder(order._id, existingOrder);
+    }
+  }
+
+  await createNotification({
+    orgId: resolvedOrgId,
+    userId: assignedEmployeeId,
+    title: 'Asset Delivered and Added',
+    message: `${order.assetName} has been delivered to you and added to your assets.`,
+    type: 'ASSET'
+  });
+
+  return asset;
+};
+
 // GET /api/orders - Get all orders with search, filters, pagination
 router.get('/', authMiddleware, async (req, res) => {
   try {
@@ -419,6 +510,8 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req, res) => {
         });
       }
 
+      await syncDeliveredOrderToAsset(order, req.user);
+
       res.json({ order });
     } else {
       const existing = MockDB.getOrderById(req.params.id);
@@ -452,6 +545,8 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req, res) => {
           type: 'ORDER'
         });
       }
+
+      await syncDeliveredOrderToAsset(order, req.user);
 
       res.json({ order });
     }
@@ -496,35 +591,7 @@ router.patch('/:id/status', authMiddleware, requireRole('ADMIN'), async (req, re
         });
       }
 
-      // If order is delivered, create an asset for the employee
-      if (status === 'Delivered' && order.assignedEmployeeId) {
-        const asset = await Asset.create({
-          orgId: req.user.orgId,
-          createdBy: req.user._id,
-          assetId: order.orderId,
-          name: order.assetName,
-          assetTag: order.orderId,
-          category: 'Device',
-          manufacturer: order.supplier,
-          status: 'Assigned',
-          currentLocation: order.currentLocation,
-          currentEmployee: order.assignedEmployeeName,
-          assignedToEmployeeId: order.assignedEmployeeId,
-          notes: `Delivered via order ${order.orderId}`,
-          createdAt: new Date(),
-        });
-
-        await createNotification({
-          orgId: req.user.orgId,
-          userId: order.assignedEmployeeId,
-          title: 'Asset Delivered and Added',
-          message: `${order.assetName} has been delivered to you and added to your assets.`,
-          type: 'ASSET'
-        });
-
-        // Soft-delete the order (can also hard delete if preferred)
-        await CompanyOrder.findByIdAndUpdate(req.params.id, { isDeleted: true });
-      }
+      await syncDeliveredOrderToAsset(order, req.user);
 
       res.json({ order: populated });
     } else {
@@ -553,34 +620,7 @@ router.patch('/:id/status', authMiddleware, requireRole('ADMIN'), async (req, re
         });
       }
 
-      // If order is delivered, create an asset for the employee
-      if (status === 'Delivered' && order.assignedEmployeeId) {
-        const asset = MockDB.createAsset({
-          orgId: req.user.orgId,
-          assetId: order.orderId,
-          name: order.assetName,
-          assetTag: order.orderId,
-          category: 'Device',
-          manufacturer: order.supplier,
-          status: 'Assigned',
-          location: order.currentLocation,
-          currentEmployee: order.assignedEmployeeName,
-          assignedToEmployeeId: order.assignedEmployeeId,
-          description: `Delivered via order ${order.orderId}`,
-        });
-
-        await createNotification({
-          orgId: req.user.orgId,
-          userId: order.assignedEmployeeId,
-          title: 'Asset Delivered and Added',
-          message: `${order.assetName} has been delivered to you and added to your assets.`,
-          type: 'ASSET'
-        });
-
-        // Mark order as deleted in mock
-        order.isDeleted = true;
-        MockDB.updateOrder(req.params.id, order);
-      }
+      await syncDeliveredOrderToAsset(order, req.user);
 
       res.json({ order });
     }
