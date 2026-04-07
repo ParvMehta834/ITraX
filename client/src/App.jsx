@@ -11,7 +11,6 @@ import EmployeeLayout from './components/employee/EmployeeLayout'
 import EmployeeAssetsPage from './pages/employee/Assets'
 import EmployeeOrdersPage from './pages/employee/Orders'
 import EmployeeLicensesPage from './pages/employee/Licenses'
-import EmployeeCategoriesPage from './pages/employee/Categories'
 import EmployeeReportsPage from './pages/employee/Reports'
 import EmployeeProfilePage from './pages/employee/Profile'
 import AdminLayout from './components/AdminLayout'
@@ -119,7 +118,6 @@ function App() {
             <Route path="assets" element={<EmployeeAssetsPage />} />
             <Route path="orders" element={<EmployeeOrdersPage />} />
             <Route path="licenses" element={<EmployeeLicensesPage />} />
-            <Route path="categories" element={<EmployeeCategoriesPage />} />
             <Route path="reports" element={<EmployeeReportsPage />} />
             <Route path="profile" element={<EmployeeProfilePage />} />
           </Route>

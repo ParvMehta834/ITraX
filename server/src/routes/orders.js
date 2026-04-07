@@ -5,6 +5,7 @@ const MockDB = require('../config/mockDb');
 const { isConnected } = require('../config/db');
 const { Parser } = require('json2csv');
 const User = require('../models/User');
+const { createNotification } = require('../services/notificationService');
 
 const router = express.Router();
 
@@ -250,6 +251,16 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req, res) => {
 
       const populated = await order.populate('createdBy', 'firstName lastName email');
 
+      if (resolvedEmployeeId) {
+        await createNotification({
+          orgId: req.user.orgId,
+          userId: resolvedEmployeeId,
+          title: 'New Order Assigned',
+          message: `Order ${finalOrderId} has been assigned to you. Current status: ${order.status}.`,
+          type: 'ORDER'
+        });
+      }
+
       res.status(201).json({ order: populated });
     } else {
       // Use mock database
@@ -290,6 +301,16 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req, res) => {
           email: req.user.email
         }
       });
+
+      if (resolvedEmployeeId) {
+        await createNotification({
+          orgId: req.user.orgId,
+          userId: resolvedEmployeeId,
+          title: 'New Order Assigned',
+          message: `Order ${finalOrderId} has been assigned to you. Current status: ${order.status}.`,
+          type: 'ORDER'
+        });
+      }
 
       res.status(201).json({ order });
     }
@@ -358,6 +379,11 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req, res) => {
     }
 
     if (isConnected()) {
+      const existing = await CompanyOrder.findById(req.params.id).select('orderId status assignedEmployeeId').lean();
+      if (!existing) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
       const order = await CompanyOrder.findByIdAndUpdate(
         req.params.id,
         updatePayload,
@@ -368,12 +394,63 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req, res) => {
         return res.status(404).json({ message: 'Order not found' });
       }
 
+      const nextAssignedId = order.assignedEmployeeId?._id || order.assignedEmployeeId || null;
+      if (nextAssignedId) {
+        await createNotification({
+          orgId: req.user.orgId,
+          userId: nextAssignedId,
+          title: 'Order Updated',
+          message: `Order ${order.orderId} was updated. Current status: ${order.status}.`,
+          type: 'ORDER'
+        });
+      }
+
+      const prevAssignedId = existing.assignedEmployeeId || null;
+      const wasReassigned = String(prevAssignedId || '') !== String(nextAssignedId || '');
+      if (wasReassigned && nextAssignedId) {
+        await createNotification({
+          orgId: req.user.orgId,
+          userId: nextAssignedId,
+          title: 'Order Assigned To You',
+          message: `Order ${order.orderId} is now assigned to you.`,
+          type: 'ORDER'
+        });
+      }
+
       res.json({ order });
     } else {
+      const existing = MockDB.getOrderById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
       const order = MockDB.updateOrder(req.params.id, updatePayload);
       if (!order) {
         return res.status(404).json({ message: 'Order not found' });
       }
+
+      const nextAssignedId = order.assignedEmployeeId || null;
+      if (nextAssignedId) {
+        await createNotification({
+          orgId: req.user.orgId,
+          userId: nextAssignedId,
+          title: 'Order Updated',
+          message: `Order ${order.orderId} was updated. Current status: ${order.status}.`,
+          type: 'ORDER'
+        });
+      }
+
+      const wasReassigned = String(existing.assignedEmployeeId || '') !== String(nextAssignedId || '');
+      if (wasReassigned && nextAssignedId) {
+        await createNotification({
+          orgId: req.user.orgId,
+          userId: nextAssignedId,
+          title: 'Order Assigned To You',
+          message: `Order ${order.orderId} is now assigned to you.`,
+          type: 'ORDER'
+        });
+      }
+
       res.json({ order });
     }
   } catch (err) {
@@ -407,6 +484,16 @@ router.patch('/:id/status', authMiddleware, requireRole('ADMIN'), async (req, re
       await order.save();
       const populated = await order.populate('createdBy', 'firstName lastName email');
 
+      if (order.assignedEmployeeId) {
+        await createNotification({
+          orgId: req.user.orgId,
+          userId: order.assignedEmployeeId,
+          title: 'Order Status Updated',
+          message: `Order ${order.orderId} status changed to ${status}.`,
+          type: 'ORDER'
+        });
+      }
+
       res.json({ order: populated });
     } else {
       const order = MockDB.getOrderById(req.params.id);
@@ -423,6 +510,16 @@ router.patch('/:id/status', authMiddleware, requireRole('ADMIN'), async (req, re
       order.updatedAt = new Date();
 
       MockDB.updateOrder(req.params.id, order);
+
+      if (order.assignedEmployeeId) {
+        await createNotification({
+          orgId: req.user.orgId,
+          userId: order.assignedEmployeeId,
+          title: 'Order Status Updated',
+          message: `Order ${order.orderId} status changed to ${status}.`,
+          type: 'ORDER'
+        });
+      }
 
       res.json({ order });
     }

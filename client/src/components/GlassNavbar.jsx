@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { Menu, X, LogOut, User } from 'lucide-react'
 import Avatar from './Avatar'
@@ -20,6 +20,36 @@ export default function GlassNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const navigate = useNavigate()
+  const navRef = useRef(null)
+  const dropdownRef = useRef(null)
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (dropdownOpen && dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false)
+      }
+      if (mobileOpen && navRef.current && !navRef.current.contains(event.target)) {
+        setMobileOpen(false)
+      }
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setDropdownOpen(false)
+        setMobileOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('touchstart', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('touchstart', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [dropdownOpen, mobileOpen])
 
   // Get user from localStorage
   const user = getAuthUser() || { name: 'User' }
@@ -40,6 +70,7 @@ export default function GlassNavbar() {
     <>
       {/* Glass Navbar */}
       <nav
+        ref={navRef}
         className="
           fixed top-0 left-0 right-0 z-50
           bg-[#050e3b] backdrop-blur-lg
@@ -87,7 +118,7 @@ export default function GlassNavbar() {
               <Notifications />
 
               {/* Profile Dropdown */}
-              <div className="relative">
+              <div ref={dropdownRef} className="relative">
                 <button
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   className="transition-transform duration-300 hover:scale-110"
@@ -151,12 +182,14 @@ export default function GlassNavbar() {
               </div>
 
               {/* Mobile Menu Button */}
-              <button
-                onClick={() => setMobileOpen(!mobileOpen)}
-                className="md:hidden p-2 text-gray-300 hover:text-white"
-              >
-                {mobileOpen ? <X size={24} /> : <Menu size={24} />}
-              </button>
+              <div className="md:hidden">
+                <button
+                  onClick={() => setMobileOpen(!mobileOpen)}
+                  className="p-2 text-gray-300 hover:text-white"
+                >
+                  {mobileOpen ? <X size={24} /> : <Menu size={24} />}
+                </button>
+              </div>
             </div>
           </div>
 

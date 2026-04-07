@@ -9,6 +9,7 @@ const Asset = require('../models/Asset');
 const MockDB = require('../config/mockDb');
 const { isConnected } = require('../config/db');
 const { Parser } = require('json2csv');
+const { createNotification } = require('../services/notificationService');
 
 const router = express.Router();
 
@@ -458,6 +459,17 @@ router.post('/assets', authMiddleware, requireRole('ADMIN'), upload.single('imag
     };
 
     const asset = await Asset.create(payload);
+
+    if (payload.assignedToEmployeeId) {
+      await createNotification({
+        orgId: req.user.orgId,
+        userId: payload.assignedToEmployeeId,
+        title: 'Asset Assigned To You',
+        message: `${asset.assetTag || asset.assetId || asset.name || 'An asset'} has been assigned to you.`,
+        type: 'ASSET'
+      });
+    }
+
     res.json({ asset });
   } catch (err) {
     console.error(err);
@@ -479,6 +491,11 @@ router.patch('/assets/:id', authMiddleware, requireRole('ADMIN'), upload.single(
     const update = { ...req.body };
     if (req.file) update.imageUrl = `/uploads/${req.file.filename}`;
 
+    const previous = await Asset.findOne({ _id: id, orgId: req.user.orgId }).select('_id assetTag assetId name assignedToEmployeeId').lean();
+    if (!previous) {
+      return res.status(404).json({ message: 'Asset not found' });
+    }
+
     if (Object.prototype.hasOwnProperty.call(update, 'assignedToEmployeeId')) {
       update.assignedToEmployeeId = update.assignedToEmployeeId || null;
       if (update.assignedToEmployeeId) {
@@ -494,6 +511,18 @@ router.patch('/assets/:id', authMiddleware, requireRole('ADMIN'), upload.single(
 
     if (!asset) {
       return res.status(404).json({ message: 'Asset not found' });
+    }
+
+    const oldAssignee = String(previous.assignedToEmployeeId || '');
+    const newAssignee = String(asset.assignedToEmployeeId || '');
+    if (newAssignee && newAssignee !== oldAssignee) {
+      await createNotification({
+        orgId: req.user.orgId,
+        userId: asset.assignedToEmployeeId,
+        title: 'Asset Assigned To You',
+        message: `${asset.assetTag || asset.assetId || asset.name || 'An asset'} has been assigned to you.`,
+        type: 'ASSET'
+      });
     }
 
     res.json({ asset });

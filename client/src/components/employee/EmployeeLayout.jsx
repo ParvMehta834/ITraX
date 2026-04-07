@@ -1,12 +1,12 @@
 import React from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { clearAuthSession } from '../../utils/authStorage'
+import Notifications from '../Notifications'
 
 const navItems = [
 	{ to: '/employee/assets', label: 'My Assets' },
 	{ to: '/employee/orders', label: 'My Orders' },
 	{ to: '/employee/licenses', label: 'Licenses' },
-	{ to: '/employee/categories', label: 'Categories' },
 	{ to: '/employee/reports', label: 'Reports' },
 	{ to: '/employee/profile', label: 'Profile' },
 ]
@@ -24,12 +24,15 @@ export default function EmployeeLayout() {
 			<div className="border-b border-slate-200 bg-white px-6 py-4">
 				<div className="mx-auto flex max-w-7xl items-center justify-between">
 					<h1 className="text-xl font-bold">Employee Portal</h1>
-					<button
-						onClick={logout}
-						className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
-					>
-						Logout
-					</button>
+					<div className="flex items-center gap-3">
+						<Notifications variant="light" />
+						<button
+							onClick={logout}
+							className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+						>
+							Logout
+						</button>
+					</div>
 				</div>
 			</div>
 

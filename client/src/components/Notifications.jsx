@@ -3,11 +3,12 @@ import { Bell } from 'lucide-react'
 import apiClient from '../services/apiClient'
 import { buildApiUrl } from '../utils/apiUrl'
 
-export default function Notifications() {
+export default function Notifications({ variant = 'dark' }) {
   const [list, setList] = useState([])
   const [open, setOpen] = useState(false)
   const [popups, setPopups] = useState([])
   const seenIds = useRef(new Set())
+  const wrapperRef = useRef(null)
 
   const unread = useMemo(() => list.filter((n) => !n.read).length, [list])
 
@@ -46,6 +47,30 @@ export default function Notifications() {
     return () => clearTimeout(timer)
   }, [popups])
 
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (open && wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setOpen(false)
+      }
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('touchstart', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('touchstart', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open])
+
   const markRead = async (id) => {
     try {
       await apiClient.patch(buildApiUrl(`/notifications/${id}/read`))
@@ -65,10 +90,14 @@ export default function Notifications() {
   }
 
   return (
-    <div className="relative">
+    <div ref={wrapperRef} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative p-2 text-gray-300 hover:text-white transition-colors duration-300 hover:bg-white/10 rounded-full"
+        className={`relative rounded-full p-2 transition-colors duration-300 ${
+          variant === 'light'
+            ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+            : 'text-gray-300 hover:text-white hover:bg-white/10'
+        }`}
       >
         <Bell size={20} />
         {unread > 0 && (

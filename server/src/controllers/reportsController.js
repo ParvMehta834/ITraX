@@ -167,9 +167,17 @@ const reportsController = {
       if (isConnected()) {
         const created = await EmployeeReport.create(payload);
         await createNotification({
+          orgId: req.user.orgId,
           targetRole: 'ADMIN',
           title: 'New Employee Report',
           message: `${payload.employeeName} submitted a new report.`,
+          type: 'REPORT'
+        });
+        await createNotification({
+          orgId: req.user.orgId,
+          userId: req.user._id,
+          title: 'Report Submitted',
+          message: 'Your report was submitted to admin successfully.',
           type: 'REPORT'
         });
         return res.status(201).json({ data: created });
@@ -177,9 +185,17 @@ const reportsController = {
 
       const created = createMockEmployeeReport(payload);
       await createNotification({
+        orgId: req.user.orgId,
         targetRole: 'ADMIN',
         title: 'New Employee Report',
         message: `${payload.employeeName} submitted a new report.`,
+        type: 'REPORT'
+      });
+      await createNotification({
+        orgId: req.user.orgId,
+        userId: req.user._id,
+        title: 'Report Submitted',
+        message: 'Your report was submitted to admin successfully.',
         type: 'REPORT'
       });
       return res.status(201).json({ data: created });
@@ -260,6 +276,7 @@ const reportsController = {
           return res.status(404).json({ message: 'Employee report not found' });
         }
         await createNotification({
+          orgId: req.user.orgId,
           userId: updated.employeeId,
           title: 'Report Feedback Updated',
           message: `Admin marked your report as ${status === 'SOLVED' ? 'Solved' : 'Open'}.`,
@@ -275,6 +292,7 @@ const reportsController = {
 
       const updated = updateMockEmployeeReport(id, updates);
       await createNotification({
+        orgId: req.user.orgId,
         userId: updated.employeeId,
         title: 'Report Feedback Updated',
         message: `Admin marked your report as ${status === 'SOLVED' ? 'Solved' : 'Open'}.`,
@@ -325,9 +343,17 @@ const reportsController = {
       }
 
       await createNotification({
+        orgId: req.user.orgId,
         targetRole: 'ADMIN',
         title: `New ${requestType.toLowerCase()} request`,
         message: `${employeeName} requested ${requestType.toLowerCase()} for ${categoryName}.`,
+        type: 'REQUEST'
+      });
+      await createNotification({
+        orgId: req.user.orgId,
+        userId: req.user._id,
+        title: `${requestType} Request Submitted`,
+        message: `Your ${requestType.toLowerCase()} request for ${categoryName} was submitted.`,
         type: 'REQUEST'
       });
 
