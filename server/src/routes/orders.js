@@ -87,24 +87,35 @@ const syncDeliveredOrderToAsset = async (order, reqUser) => {
 
   let asset;
   if (isConnected()) {
-    asset = await Asset.findOneAndUpdate(
-      { orgId: resolvedOrgId, assetTag: order.orderId },
-      {
-        $set: {
-          ...assetPayload,
-          isDeleted: false,
-          updatedAt: new Date(),
-          updatedBy: reqUser._id,
+    try {
+      asset = await Asset.findOneAndUpdate(
+        { orgId: resolvedOrgId, assetTag: order.orderId },
+        {
+          $set: {
+            ...assetPayload,
+            isDeleted: false,
+            updatedAt: new Date(),
+            updatedBy: reqUser._id,
+          },
+          $setOnInsert: {
+            createdAt: new Date(),
+            createdBy: reqUser._id,
+          },
         },
-        $setOnInsert: {
-          createdAt: new Date(),
-          createdBy: reqUser._id,
-        },
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    ).lean();
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      ).lean();
+    } catch (error) {
+      if (error?.code === 11000) {
+        asset = await Asset.findOne({ orgId: resolvedOrgId, assetTag: order.orderId }).lean();
+      } else {
+        console.error('Failed to sync delivered order to asset:', error);
+        return null;
+      }
+    }
 
-    await CompanyOrder.findByIdAndUpdate(order._id, { isDeleted: true });
+    if (asset) {
+      await CompanyOrder.findByIdAndUpdate(order._id, { isDeleted: true });
+    }
   } else {
     const orgId = normalizeOrgId(resolvedOrgId);
     const existingAsset = MockDB.getAssets().find((candidate) => {
@@ -134,13 +145,17 @@ const syncDeliveredOrderToAsset = async (order, reqUser) => {
     }
   }
 
-  await createNotification({
-    orgId: resolvedOrgId,
-    userId: assignedEmployeeId,
-    title: 'Asset Delivered and Added',
-    message: `${order.assetName} has been delivered to you and added to your assets.`,
-    type: 'ASSET'
-  });
+  try {
+    await createNotification({
+      orgId: resolvedOrgId,
+      userId: assignedEmployeeId,
+      title: 'Asset Delivered and Added',
+      message: `${order.assetName} has been delivered to you and added to your assets.`,
+      type: 'ASSET'
+    });
+  } catch (error) {
+    console.error('Failed to create delivered-order notification:', error);
+  }
 
   return asset;
 };
