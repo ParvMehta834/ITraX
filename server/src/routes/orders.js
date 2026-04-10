@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { authMiddleware, requireRole } = require('../middleware/auth');
 const CompanyOrder = require('../models/CompanyOrder');
 const Asset = require('../models/Asset');
@@ -47,8 +48,14 @@ const generateOrderId = async () => {
   return `ORD-${timestamp}-${count + 1}`;
 };
 
+const isValidObjectId = (value) => {
+  if (!value) return false;
+  return mongoose.Types.ObjectId.isValid(String(value));
+};
+
 const syncDeliveredOrderToAsset = async (order, reqUser) => {
-  const assignedEmployeeId = order?.assignedEmployeeId?._id || order?.assignedEmployeeId || null;
+  const rawAssignedEmployeeId = order?.assignedEmployeeId?._id || order?.assignedEmployeeId || null;
+  const assignedEmployeeId = isValidObjectId(rawAssignedEmployeeId) ? String(rawAssignedEmployeeId) : null;
   if (order?.status !== 'Delivered' || !assignedEmployeeId) {
     return null;
   }
@@ -573,6 +580,9 @@ router.patch('/:id/status', authMiddleware, requireRole('ADMIN'), async (req, re
 
       // Add new tracking history entry
       order.status = status;
+      if (!Array.isArray(order.trackingHistory)) {
+        order.trackingHistory = [];
+      }
       order.trackingHistory.push({
         stage: status,
         date: new Date()
